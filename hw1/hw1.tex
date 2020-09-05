@@ -1,0 +1,94 @@
+\documentclass[twoside,11pt]{article}
+%%%%% PACKAGES %%%%%%
+\usepackage[english]{babel}
+\usepackage{color}
+\usepackage[margin=1in]{geometry}
+\usepackage{sectsty}
+\usepackage{enumitem}
+\usepackage{array,mathtools}
+\usepackage[makeroom]{cancel}
+\newcommand*{\carry}[1][1]{\overset{#1}}
+\newcolumntype{B}[1]{r*{#1}{@{\,}r}}
+
+\newcommand\assignmentNumber{1}
+\newcommand\studentName{Andrei Tumbar}
+\sectionfont{\fontsize{14}{16}\selectfont}
+
+\begin{document}
+
+\title{\vspace{-3cm}Homework \assignmentNumber\\\studentName\vspace{-1.4cm}}
+\maketitle
+
+\section{Convert each of the following decimal integers into its natural binary equivalent.}
+\begin{enumerate}[label=\alph*)]
+\large\item $13 = 8 + 4 + 1 = 2^3 + 2^2 + 2^0 = 1101$
+\large\item $44 = 1(32) + 0(16) + 1(8) + 1(4) + 0(2) + 0(1) = 101100$
+\end{enumerate}
+
+\section{Convert the following natural binary integer into its decimal equivalent: $1010110$.}
+\large\begin{equation*}
+1010110 = 2^6 + 2^4 + 2^2 + 2^1 = 64 + 16 + 4 + 2 = 86
+\end{equation*}
+
+\section{Perform the following binary addition: $10100 + 00111$.}
+
+\Large\begin{equation*}
+\begin{array}{B1}
+         & 1 \carry0 1 0 0 \\
+    {} + & 0 0 1 1 1 \\\hline
+         & 1 1 0 1 1
+\end{array}
+\end{equation*}
+
+\section{Perform the following hexadecimal addition: 0x66 $+$ 0x75.}
+
+\Large\begin{equation*}
+\begin{array}{B2}
+               & 6 & 6 \\
+    {} +       & 7 & 5 \\\hline
+    \text{0x}  & D & B
+\end{array}
+\end{equation*}
+
+\section{Suppose that P = 0x1234, and Q = 0x ABEF. In 16-bit hexadecimal arithmetic, calculate the value of the following expressions.}
+
+\noindent\begin{minipage}{.5\linewidth}\Large\begin{equation*}
+\begin{array}{B5}
+               & 1 & \carry{2} & \carry{3} & 4 \\
+    {} +       & A & B         &        E  & F \\\hline
+    \text{0x}  & B & D         &        2  & 3
+\end{array}
+\end{equation*}\end{minipage}
+\begin{minipage}{.5\linewidth}\Large\begin{equation*}
+\begin{array}{B5}
+             & A & B & E & F \\
+        {} - & 1 & 2 & 3 & 4 \\\hline
+             & 9 & 9 & B & B \\\hline
+           - & 9 & 9 & B & B
+\end{array}
+\end{equation*}\end{minipage}
+\pagebreak
+\section{Compute the results of the following decimal arithmetic operations using 8-bit two’s complement arithmetic. Also, indicate whether or not arithmetic overflow occurs.}
+
+\Large\begin{equation*}
+\begin{array}{B1}
+         & 0 0 \carry{0} \carry{1} 1 \carry{0} \carry{0} 1 \\
+    {} + & 0 0 0 0 1 0 1 1 \\\hline
+         & 0 0 1 0 0 1 0 0
+\end{array}
+\hspace{1cm}\text{No overflow}
+\end{equation*}
+
+\Large\begin{equation*}
+\begin{array}{B1}
+         & 1 1 0 0 0 0 1 0 \\
+    {} - & 0 0 1 1 0 0 0 1 \\\hline
+         & \carry{1} 1 0 \carry{0} \carry{0} \carry{0} 1 0 \\
+    {} + & 1 1 0 0 1 1 1 1 \\\hline
+         & 1 0 0 1 0 0 0 1
+\end{array}
+\hspace{1cm}\text{No Overflow}
+\end{equation*}
+
+
+\end{document}

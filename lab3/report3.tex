@@ -13,12 +13,11 @@
 \newcommand{\LabExNum}{2}
 \newcommand{\LabExTitle}{Basic Arithmetic Operations}
 \newcommand{\StudentName}{Andrei Tumbar}
-\newcommand{\DateSubmit}{09-01-20}
-\newcommand{\LabSection}{1}
+\newcommand{\DateSubmit}{09-14-20}
+\newcommand{\LabSection}{5}
 \newcommand{\LabInstructor}{Melton}
-\newcommand{\TAa}{Cameron Hudson}
-\newcommand{\TAb}{Chris Augsburger}
-\newcommand{\TAc}{Anthony Bacchetta}
+\newcommand{\TAa}{Tianran Cui}
+\newcommand{\TAb}{Anthony Bacchetta}
 \newcommand{\LectureSection}{1}
 \newcommand{\LectureInstructor}{Melton}
 %End macros for document property values
@@ -110,8 +109,7 @@
   \fancyfoot[C]{\small \CourseNumber\ \SemesterCode\ \@author:  \@title:  
     Page \thepage\ of \pageref*{LastPage}}
 }
-%May require second build to get correct page numbers. 
-           
+%May require second build to get correct page numbers.            
 \begin{document}
 \raggedbottom
 \widowpenalties 1 10000
@@ -155,7 +153,6 @@
     Instructor:&\LabInstructor\\
     TA:&\TAa\\
     &\TAb\\
-    &\TAc\\
     \\
     Lecture Section:&\LectureSection\\
     Lecture Instructor:&\LectureInstructor
@@ -165,85 +162,55 @@
 \thispagestyle{plain}
 %***********************************************************************
 %Report body begins here
-\section*{Abstract}
-
-\par In this laboratory exercise, basic arithmetic operations were performed
-to evaluate students' profficiency with simple assembly instructions. A given
-arithmetic expression was provided. Intermediate results were calculated 
-before writing the assembly instructions so that the code could be debugged
-after writing. The assembly instructions included moving constants into registers
-and performing arithmetic operations such as addition, subtraction, multiplication,
-and division. Assembly was written for ARM Cortex-M0+ processors.
-
-\section*{Procedure}
-
-This exercise was built around calculating the value of the following arithmetic
-expression:
-
-\begin{equation*}
-18 + ([-11] \div 2) + 13 + (5 \cdot 9) - 42 + 3
-\end{equation*}
-
-One of the requirements is that all constants that can be seen in the expression, must
-be loaded into registers before they are used. Immediate values used in bitshifting
-operations do not need to be loaded beforehand.
-
-By continuously loading \code{R0} with the intermediate result of each step, more registers
-are left free for other operations. To compute the result from the equation above, use \code{R1}
-to first store $-11$ and then divide by $2$ (perform with a right-arithmetic shift by one bit). 
-Follow-up by storing $18$ into \code{R0} and adding \code{R0} and \code{R1}. This result should
-be stored back into \code{R0}.
-
-\code{R0} should now have the result from computing $18 + ([-11] \div 2)$. The rest of the expression
-can be completed using the same method. The multiplication $5 \cdot 9$ can be performed by calculated
-$5 \cdot 8 + 5$. Multiplication by a power $2$ can also be expressed by the following:
-
-\begin{equation*}
-\alpha \cdot 2^\beta = \alpha << \beta 
-\end{equation*}
-
-This calculation can be performed using the $R1$ register because the previous result is no
-loonger needed. The rest of the expression is simply performed using \code{ADDS} and \code{SUBS}
-operations.
-
 \section*{Results}
 
-The expression should yield the result of $31$. This is because $\frac{-11}{2}$
-is an integer division and should therefore yield $-6$ instead of $-5.5$. $31$ 
-in hex is \code{0x1F}. After the assembly instructions were written, the program
-was run with the debugger to verify the results. A screen capture was taken after
-the final instruction was performed.
+Screen captures were taken for two different input sets. The variable memory
+is divided into 4-byte signed decimal values. The first two values are \code{P}
+and \code{Q}. The next three are \code{F}, \code{G}, and \code{Result} respectively. 
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[]{capture-1}
+	\caption{Debugger results after program execution with first input set.}
+	\label{fig:capture1}
+\end{figure}
+
+Figure \ref{fig:capture1} shows the register values and memory contents after
+execution with the first input set where $P = 19_{10}$ and $Q=-3_{10}$
 
 \pagebreak
 
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\textwidth]{capture}
-	\caption{Debugger results after program execution.}
-	\label{fig:capture}
+	\includegraphics[]{capture-2}
+	\caption{Debugger results after program execution with second input set.}
+	\label{fig:capture2}
 \end{figure}
 
-Figure 1 shows the values of every register. Line 137 initialy fills every register with
-\code{RN=0xNNNNNNNN}. General purpose registers \code{R3} and above were never used and
-therefore still contain the values they were initalized with. \code{R0} holds the result
-of the expression in question, \code{0x1F} or $31$ in base 10 which matches the prediction.
+Figure \ref{fig:capture2} shows the register values as well as memory contents
+after the second input set where $P = -11_{10}$ and $Q=-22_{10}$.
 
-\section*{Conclusion}
-%\par The conclusion section provides the reader with insights that came from 
-%  completing the lab exercise.  It describes the lessons learned in the 
-%  exercise and analyzes the results.  It also notes and explains any 
-%  deviations from the assigned procedure.  It concludes by describing 
-%  general concepts applied to achieve the results and by making 
-%  statements that extend beyond the scope of the exercise to the general 
-%  case, (e.g., where the concepts or results could be applied outside of 
-%  the lab exercise).
+According to prelab calculations, in the first input set \code{F} and \code{G}
+should both be $75_{10}$ which would case \code{Result} to overflow. Figure
+\ref{fig:capture1} shows the \code{Result} variable with a value of $10$
+and \code{F} and \code{G} both have $75_{10}$ indicating that the results were
+correct.
 
-This laboratory exercise was important because it taught students basic assembly instructions
-and program flow as well as how to effectively use the debugger. By calculating intermediate
-values before the program is written and including pseudo-code along with the assembly instructions,
-the program was very easy to debug. These basic assembly skills can be applied to more complex 
-programs because they provide the more basic operations and computations.
+Similarly, for the second input set, prelab calculations revealed $F=-12_{10}$,
+$G=23_{10}$, and $Result=11_{10}$. This is corroborated by the results shown in
+Figure \ref{fig:capture2}.
 
+\section*{Question}
+In theory you could reduce the overflow of the calculations if the overflow
+occurs in one of the intermediate steps. For example in the expression $G=3P - 2Q + 12$, $G$ would overflow if $3P$ was out of range of $[-128,127]$ even the final
+result could still be within that range. To reduce this overflow, the order of
+operations can be changed like so:
+
+\begin{equation}
+G = P + 2 \cdot (P - Q) + 12
+\end{equation}
+
+This alternate equation would stop overflow in intermediate steps but would obviously not avoid it if the result were to overflow.
 
 \label{LastPage}
 \end{document}

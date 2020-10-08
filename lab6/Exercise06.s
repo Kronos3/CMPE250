@@ -22,7 +22,7 @@
 ;EQUates
 ; UART0 Equates
 ;UART0 register addresses as well as bit field offsets and masks
-;from 'MKL05Z4.s‘ included by program template
+;from 'MKL05Z4.sï¿½ included by program template
 ;---------------------------------------------------------------
 ;UART0_BDH
 ; 0-> 7:LIN break detect IE (disabled)
@@ -31,7 +31,7 @@
 ;00001->4-0:SBR[12:0] (UART0CLK / [9600 * (OSR + 1)])
 ;UART0CLK is MCGFLLCLK
 ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
-;SBR ˜ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+;SBR ï¿½ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
 ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
 UART0_BDH_9600 EQU 0x01
 ;---------------------------------------------------------------
@@ -39,7 +39,7 @@ UART0_BDH_9600 EQU 0x01
 ;26->7-0:SBR[7:0] (UART0CLK / [9600 * (OSR + 1)])
 ;UART0CLK is MCGFLLCLK
 ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
-;SBR ˜ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+;SBR ï¿½ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
 ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
 UART0_BDL_9600 EQU 0x38
 
@@ -186,7 +186,7 @@ GetChar     PROC {R0-R3}
             ; Wait until a character is ready
             ;Set Z if RDRF=0
             LDR  R1,=UART0_BASE
-            MOVS R3,#UART0_S1_RDRF_MASK
+            MOVS R2,#UART0_S1_RDRF_MASK
 getchar_l   LDRB R3,[R1,#UART0_S1_OFFSET]
             TST  R2,R3
             BEQ  getchar_l
@@ -262,7 +262,7 @@ PORT_PCR_SET_PTB1_UART0_TX  EQU  (PORT_PCR_ISF_MASK :OR: PORT_PCR_MUX_SELECT_2_M
             BICS  R2,R2,R1
             STRB  R2,[R0,#UART0_C2_OFFSET]
             
-            ; Set UART0 baud rate—BDH before BDL
+            ; Set UART0 baud rateï¿½BDH before BDL
             MOVS R1,#UART0_BDH_9600
             STRB R1,[R0,#UART0_BDH_OFFSET]
             MOVS R1,#UART0_BDL_9600

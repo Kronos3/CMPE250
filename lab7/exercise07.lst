@@ -1,0 +1,1502 @@
+
+
+
+ARM Macro Assembler    Page 1 Program Title for Listing Header Goes Here
+
+
+    1 00000000                 TTL              Program Title for Listing Heade
+r Goes Here
+    2 00000000         ;*******************************************************
+                       *********
+    3 00000000         ;Descriptive comment header goes here.
+    4 00000000         ;Implements a circular buffer queue strucute 
+    5 00000000         ;Name:  Andrei Tumbar
+    6 00000000         ;Date:  10/07/20
+    7 00000000         ;Class:  CMPE-250
+    8 00000000         ;Section:  5, Tuesday, 11 AM
+    9 00000000         ;-------------------------------------------------------
+                       --------
+   10 00000000         ;Keil Template for KL05
+   11 00000000         ;R. W. Melton
+   12 00000000         ;September 13, 2020
+   13 00000000         ;*******************************************************
+                       *********
+   14 00000000         ;Assembler directives
+   15 00000000                 THUMB
+   17 00000000         ;*******************************************************
+                       *********
+   18 00000000         ;Include files
+   19 00000000                 GET              MKL05Z4.s   ;Included by start.
+                                                            s
+   21 00000000         ;*******************************************************
+                       *********
+   22 00000000         ;EQUates
+   23 00000000         ; UART0 Equates
+   24 00000000         ;UART0 register addresses as well as bit field offsets a
+                       nd masks
+   25 00000000         ;from 'MKL05Z4.s? included by program template
+   26 00000000         ;-------------------------------------------------------
+                       --------
+   27 00000000         ;UART0_BDH
+   28 00000000         ; 0-> 7:LIN break detect IE (disabled)
+   29 00000000         ; 0-> 6:RxD input active edge IE (disabled)
+   30 00000000         ; 0-> 5:Stop bit number select (1)
+   31 00000000         ;00001->4-0:SBR[12:0] (UART0CLK / [9600 * (OSR + 1)])
+   32 00000000         ;UART0CLK is MCGFLLCLK
+   33 00000000         ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
+   34 00000000         ;SBR ? 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+   35 00000000         ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
+   36 00000000 00000001 
+                       UART0_BDH_9600
+                               EQU              0x01
+   37 00000000         ;-------------------------------------------------------
+                       --------
+   38 00000000         ;UART0_BDL
+   39 00000000         ;26->7-0:SBR[7:0] (UART0CLK / [9600 * (OSR + 1)])
+   40 00000000         ;UART0CLK is MCGFLLCLK
+   41 00000000         ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
+   42 00000000         ;SBR ? 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+   43 00000000         ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
+   44 00000000 00000038 
+                       UART0_BDL_9600
+                               EQU              0x38
+   45 00000000         
+   46 00000000         ;UART0_C1
+   47 00000000         ;0-->7:LOOPS=loops select (normal)
+
+
+
+ARM Macro Assembler    Page 2 Program Title for Listing Header Goes Here
+
+
+   48 00000000         ;0-->6:DOZEEN=doze enable (disabled)
+   49 00000000         ;0-->5:RSRC=receiver source select (internal--no effect 
+                       LOOPS=0)
+   50 00000000         ;0-->4:M=9- or 8-bit mode select
+   51 00000000         ; (1 start, 8 data [lsb first], 1 stop)
+   52 00000000         ;0-->3:WAKE=receiver wakeup method select (idle)
+   53 00000000         ;0-->2:IDLE=idle line type select (idle begins after sta
+                       rt bit)
+   54 00000000         ;0-->1:PE=parity enable (disabled)
+   55 00000000         ;0-->0:PT=parity type (even parity--no effect PE=0)
+   56 00000000 00000000 
+                       UART0_C1_8N1
+                               EQU              0x00
+   57 00000000         ;-------------------------------------------------------
+                       --------
+   58 00000000         ;UART0_C2
+   59 00000000         ;0-->7:TIE=transmit IE for TDRE (disabled)
+   60 00000000         ;0-->6:TCIE=transmission complete IE for TC (disabled)
+   61 00000000         ;0-->5:RIE=receiver IE for RDRF (disabled)
+   62 00000000         ;0-->4:ILIE=idle line IE for IDLE (disabled)
+   63 00000000         ;1-->3:TE=transmitter enable (enabled)
+   64 00000000         ;1-->2:RE=receiver enable (enabled)
+   65 00000000         ;0-->1:RWU=receiver wakeup control (normal)
+   66 00000000         ;0-->0:SBK=send break (disabled, normal)
+   67 00000000 0000000C 
+                       UART0_C2_T_R
+                               EQU              (UART0_C2_TE_MASK :OR: UART0_C2
+_RE_MASK)
+   68 00000000         
+   69 00000000         ;UART0_C3
+   70 00000000         ;0-->7:R8T9=9th data bit for receiver (not used M=0)
+   71 00000000         ; 10th data bit for transmitter (not used M10=0)
+   72 00000000         ;0-->6:R9T8=9th data bit for transmitter (not used M=0)
+   73 00000000         ; 10th data bit for receiver (not used M10=0)
+   74 00000000         ;0-->5:TXDIR=UART_TX pin direction in single-wire mode
+   75 00000000         ; (no effect LOOPS=0)
+   76 00000000         ;0-->4:TXINV=transmit data inversion (not inverted)
+   77 00000000         ;0-->3:ORIE=overrun IE for OR (disabled)
+   78 00000000         ;0-->2:NEIE=noise error IE for NF (disabled)
+   79 00000000         ;0-->1:FEIE=framing error IE for FE (disabled)
+   80 00000000         ;0-->0:PEIE=parity error IE for PF (disabled)
+   81 00000000 00000000 
+                       UART0_C3_NO_TXINV
+                               EQU              0x00
+   82 00000000         
+   83 00000000         ;UART0_C4
+   84 00000000         ; 0--> 7:MAEN1=match address mode enable 1 (disabled)
+   85 00000000         ; 0--> 6:MAEN2=match address mode enable 2 (disabled)
+   86 00000000         ; 0--> 5:M10=10-bit mode select (not selected)
+   87 00000000         ;01111-->4-0:OSR=over sampling ratio (16)
+   88 00000000         ; = 1 + OSR for 3 <= OSR <= 31
+   89 00000000         ; = 16 for 0 <= OSR <= 2 (invalid values)
+   90 00000000 0000000F 
+                       UART0_C4_OSR_16
+                               EQU              0x0F
+   91 00000000 0000000F 
+                       UART0_C4_NO_MATCH_OSR_16
+                               EQU              UART0_C4_OSR_16
+   92 00000000         ;-------------------------------------------------------
+
+
+
+ARM Macro Assembler    Page 3 Program Title for Listing Header Goes Here
+
+
+                       --------
+   93 00000000         ;UART0_C5
+   94 00000000         ; 0--> 7:TDMAE=transmitter DMA enable (disabled)
+   95 00000000         ; 0--> 6:Reserved; read-only; always 0
+   96 00000000         ; 0--> 5:RDMAE=receiver full DMA enable (disabled)
+   97 00000000         ;000-->4-2:Reserved; read-only; always 0
+   98 00000000         ; 0--> 1:BOTHEDGE=both edge sampling (rising edge only)
+   99 00000000         ; 0--> 0:RESYNCDIS=resynchronization disable (enabled)
+  100 00000000 00000000 
+                       UART0_C5_NO_DMA_SSR_SYNC
+                               EQU              0x00
+  101 00000000         
+  102 00000000         ;UART0_S1
+  103 00000000         ;0-->7:TDRE=transmit data register empty flag; read-only
+                       
+  104 00000000         ;0-->6:TC=transmission complete flag; read-only
+  105 00000000         ;0-->5:RDRF=receive data register full flag; read-only
+  106 00000000         ;1-->4:IDLE=idle line flag; write 1 to clear (clear)
+  107 00000000         ;1-->3:OR=receiver overrun flag; write 1 to clear (clear
+                       )
+  108 00000000         ;1-->2:NF=noise flag; write 1 to clear (clear)
+  109 00000000         ;1-->1:FE=framing error flag; write 1 to clear (clear)
+  110 00000000         ;1-->0:PF=parity error flag; write 1 to clear (clear)
+  115 00000000 0000001F 
+                       UART0_S1_CLEAR_FLAGS
+                               EQU              (UART0_S1_IDLE_MASK :OR:  UART
+0_S1_OR_MASK :OR:  UART0_S1_NF_MASK :OR:  UART0_S1_FE_MASK :OR:  UART0_S1_PF
+_MASK)
+  116 00000000         
+  117 00000000         ;UART0_S2
+  118 00000000         ;1-->7:LBKDIF=LIN break detect interrupt flag (clear)
+  119 00000000         ; write 1 to clear
+  120 00000000         ;1-->6:RXEDGIF=RxD pin active edge interrupt flag (clear
+                       )
+  121 00000000         ; write 1 to clear
+  122 00000000         ;0-->5:(reserved); read-only; always 0
+  123 00000000         ;0-->4:RXINV=receive data inversion (disabled)
+  124 00000000         ;0-->3:RWUID=receive wake-up idle detect
+  125 00000000         ;0-->2:BRK13=break character generation length (10)
+  126 00000000         ;0-->1:LBKDE=LIN break detect enable (disabled)
+  127 00000000         ;0-->0:RAF=receiver active flag; read-only
+  129 00000000 000000C0 
+                       UART0_S2_NO_RXINV_BRK10_NO_LBKDETECT_CLEAR_FLAGS
+                               EQU              (UART0_S2_LBKDIF_MASK :OR: UART
+0_S2_RXEDGIF_MASK)
+  130 00000000         
+  131 00000000         ;*******************************************************
+                       *********
+  132 00000000         ;EQUates
+  133 00000000         ; Queue management record field offsets
+  134 00000000 00000000 
+                       IN_PTR  EQU              0
+  135 00000000 00000004 
+                       OUT_PTR EQU              4
+  136 00000000 00000008 
+                       BUF_STRT
+                               EQU              8
+  137 00000000 0000000C 
+                       BUF_PAST
+
+
+
+ARM Macro Assembler    Page 4 Program Title for Listing Header Goes Here
+
+
+                               EQU              12
+  138 00000000 00000010 
+                       BUF_SIZE
+                               EQU              16
+  139 00000000 00000011 
+                       NUM_ENQD
+                               EQU              17
+  140 00000000         ; Queue structure sizes
+  141 00000000 00000004 
+                       Q_BUF_SZ
+                               EQU              4           ;Queue contents
+  142 00000000 00000012 
+                       Q_REC_SZ
+                               EQU              18          ;Queue management r
+                                                            ecord
+  143 00000000         
+  144 00000000         
+  145 00000000                 MACRO
+  146 00000000         $label  PUSH_STATUS      $RBUF, $R
+  147 00000000                 LDRB             $RBUF,[$R,#NUM_ENQD]
+  148 00000000                 PUSH             {$RBUF}
+  149 00000000                 LDR              $RBUF,[$R,#OUT_PTR]
+  150 00000000                 PUSH             {$RBUF}
+  151 00000000                 LDR              $RBUF,[$R,#IN_PTR]
+  152 00000000                 PUSH             {$RBUF}
+  153 00000000                 MEND
+  154 00000000         
+  155 00000000                 MACRO
+  156 00000000         $label  P                $string
+  157 00000000                 PUSH             {R1}
+  158 00000000                 LDR              R1,=$string
+  159 00000000                 BL               printf
+  160 00000000                 POP              {R1}
+  161 00000000                 MEND
+  162 00000000         
+  163 00000000         ;*******************************************************
+                       *********
+  164 00000000         ;Program
+  165 00000000         ;Linker requires Reset_Handler
+  166 00000000                 AREA             MyCode,CODE,READONLY
+  167 00000000                 ENTRY
+  168 00000000                 EXPORT           Reset_Handler
+  169 00000000                 IMPORT           Startup
+  170 00000000         Reset_Handler
+                               PROC             {}
+  171 00000000         main
+  172 00000000         ;-------------------------------------------------------
+                       --------
+  173 00000000         ;Mask interrupts
+  174 00000000 B672            CPSID            I
+  175 00000002         ;KL05 system startup with 48-MHz system clock
+  176 00000002 F7FF FFFE       BL               Startup
+  177 00000006 F7FF FFFE       BL               Init_UART0_Polling
+  178 0000000A         ;-------------------------------------------------------
+                       --------
+  179 0000000A         ;>>>>> begin main program code <<<<<
+  180 0000000A         ; Initialize a queue structure with
+  181 0000000A         ; a 4-byte circular buffer
+  182 0000000A 48EE            LDR              R0,=buffer
+
+
+
+ARM Macro Assembler    Page 5 Program Title for Listing Header Goes Here
+
+
+  183 0000000C 49EE            LDR              R1,=queue
+  184 0000000E 2204            MOVS             R2,#Q_BUF_SZ
+  185 00000010 F7FF FFFE       BL               InitQueue
+  186 00000014         
+  187 00000014                 P                newline
+  157 00000014 B402            PUSH             {R1}
+  158 00000016 49ED            LDR              R1,=newline
+  159 00000018 F7FF FFFE       BL               printf
+  160 0000001C BC02            POP              {R1}
+  188 0000001E         
+  189 0000001E         main_loop
+  190 0000001E         __0     P                prompt      ; Print the prompt 
+                                                            string
+  157 0000001E B402            PUSH             {R1}
+  158 00000020 49EB            LDR              R1,=prompt
+  159 00000022 F7FF FFFE       BL               printf
+  160 00000026 BC02            POP              {R1}
+  191 00000028         ; Get input
+  192 00000028 F7FF FFFE       BL               GetChar
+  193 0000002C F7FF FFFE       BL               PutChar
+  194 00000030         
+  195 00000030         ; Print a newline and handle the inputed command
+  196 00000030                 P                newline
+  157 00000030 B402            PUSH             {R1}
+  158 00000032 49E6            LDR              R1,=newline
+  159 00000034 F7FF FFFE       BL               printf
+  160 00000038 BC02            POP              {R1}
+  197 0000003A F7FF FFFE       BL               HandleCommand
+  198 0000003E         
+  199 0000003E E7EE            B                main_loop
+  200 00000040         
+  201 00000040         ;>>>>>   end main program code <<<<<
+  202 00000040         ;Stay here
+  203 00000040 E7FE            B                .
+  204 00000042                 ENDP
+  205 00000042         ;>>>>> begin subroutine code <<<<<
+  206 00000042         
+  207 00000042         ; Handle a command input
+  208 00000042         ; Input:
+  209 00000042         ;   R0: input command (case insensitive)
+  210 00000042         ;   R1: Pointer to queue structure
+  211 00000042         ; Output (None)
+  212 00000042         ; Modified Registers (None)
+  213 00000042         HandleCommand
+                               PROC             {R0-R12}
+  214 00000042 B51F            PUSH             {R0-R4,LR}
+  215 00000044 00000061 
+                       AS_L_S  EQU              'a'
+  216 00000044 0000007A 
+                       AS_L_E  EQU              'z'
+  217 00000044 00000041 
+                       AS_U_S  EQU              'A'
+  218 00000044 0000005A 
+                       AS_U_E  EQU              'Z'
+  219 00000044         
+  220 00000044         ; Convert the character to upper-case
+  221 00000044 2841            CMP              R0,#AS_U_S
+  222 00000046 DB4A            BLT              invalid_char
+  223 00000048 285A            CMP              R0,#AS_U_E
+
+
+
+ARM Macro Assembler    Page 6 Program Title for Listing Header Goes Here
+
+
+  224 0000004A DD01            BLE              do_cmd      ; Already in upperc
+                                                            ase
+  225 0000004C         ; Convert to upper case
+  226 0000004C 3820            SUBS             R0,R0,#(AS_L_S - AS_U_S)
+  227 0000004E E7FF            B                do_cmd
+  228 00000050         
+  229 00000050 2844    do_cmd  CMP              R0,#'D'
+  230 00000052 D008            BEQ              do_deq
+  231 00000054 2845            CMP              R0,#'E'
+  232 00000056 D00C            BEQ              do_enq
+  233 00000058 2848            CMP              R0,#'H'
+  234 0000005A D03C            BEQ              do_help
+  235 0000005C 2850            CMP              R0,#'P'
+  236 0000005E D01A            BEQ              do_print
+  237 00000060 2853            CMP              R0,#'S'
+  238 00000062 D032            BEQ              do_status
+  239 00000064 E03B            B                invalid_char
+  240 00000066         
+  241 00000066 F7FF FFFE 
+                       do_deq  BL               Dequeue
+  242 0000006A D245            BCS              handle_fail
+  243 0000006C F7FF FFFE       BL               PutChar
+  244 00000070 E048            B                print_status
+  245 00000072         
+  246 00000072         do_enq                               ; Print the enqueue
+                                                             prompt
+  247 00000072         __1     P                prompt_en
+  157 00000072 B402            PUSH             {R1}
+  158 00000074 49D7            LDR              R1,=prompt_en
+  159 00000076 F7FF FFFE       BL               printf
+  160 0000007A BC02            POP              {R1}
+  248 0000007C         
+  249 0000007C         ; Get the character and enqueue it
+  250 0000007C F7FF FFFE       BL               GetChar
+  251 00000080 F7FF FFFE       BL               PutChar
+  252 00000084         __8     P                newline
+  157 00000084 B402            PUSH             {R1}
+  158 00000086 49D1            LDR              R1,=newline
+  159 00000088 F7FF FFFE       BL               printf
+  160 0000008C BC02            POP              {R1}
+  253 0000008E         
+  254 0000008E F7FF FFFE       BL               Enqueue
+  255 00000092 D231            BCS              handle_fail
+  256 00000094 E02A            B                handle_info
+  257 00000096         
+  258 00000096         do_print                             ; Print the content
+                                                            s of the queue
+  259 00000096 203E            MOVS             R0,#'>'
+  260 00000098 F7FF FFFE       BL               PutChar
+  261 0000009C 684A            LDR              R2,[R1,#OUT_PTR]
+  262 0000009E 7C4B            LDRB             R3,[R1,#NUM_ENQD]
+  263 000000A0 68CC            LDR              R4,[R1,#BUF_PAST]
+  264 000000A2 421B    do_print_l
+                               TST              R3,R3       ; While we have not
+                                                             printed all of the
+                                                             characters
+  265 000000A4 D008            BEQ              do_print_b  ; break
+  266 000000A6 7810            LDRB             R0,[R2,#0]  ; Print this charac
+                                                            ter
+
+
+
+ARM Macro Assembler    Page 7 Program Title for Listing Header Goes Here
+
+
+  267 000000A8 F7FF FFFE       BL               PutChar
+  268 000000AC 1C52            ADDS             R2,R2,#1    ; Increment the poi
+                                                            nter
+  269 000000AE 1E5B            SUBS             R3,R3,#1    ; Decrement the dow
+                                                            n counter
+  270 000000B0 42A2            CMP              R2,R4       ; Check if we need 
+                                                            to circle back
+  271 000000B2 DBF6            BLT              do_print_l
+  272 000000B4 688A            LDR              R2,[R1,#BUF_STRT] ; Circle back
+                                                             to the start of th
+                                                            e buffer
+  273 000000B6 E7F4            B                do_print_l
+  274 000000B8 203C    do_print_b
+                               MOVS             R0,#'<'
+  275 000000BA F7FF FFFE       BL               PutChar
+  276 000000BE                 P                newline
+  157 000000BE B402            PUSH             {R1}
+  158 000000C0 49C2            LDR              R1,=newline
+  159 000000C2 F7FF FFFE       BL               printf
+  160 000000C6 BC02            POP              {R1}
+  277 000000C8 E025            B                end_handle
+  278 000000CA         
+  279 000000CA         do_status
+  280 000000CA         __7     P                status_s
+  157 000000CA B402            PUSH             {R1}
+  158 000000CC 49C2            LDR              R1,=status_s
+  159 000000CE F7FF FFFE       BL               printf
+  160 000000D2 BC02            POP              {R1}
+  281 000000D4 E016            B                print_status
+  282 000000D6         
+  283 000000D6 49C1    do_help LDR              R1,=help
+  284 000000D8 F7FF FFFE       BL               printf
+  285 000000DC E01B            B                end_handle
+  286 000000DE         
+  287 000000DE         invalid_char
+  288 000000DE B402            PUSH             {R1}
+  289 000000E0 B401            PUSH             {R0}
+  290 000000E2 49BF            LDR              R1,=invalid_in
+  291 000000E4 F7FF FFFE 
+                       __6     BL               printf
+  292 000000E8 BC02            POP              {R1}
+  293 000000EA E014            B                end_handle
+  294 000000EC         
+  295 000000EC         handle_info
+  296 000000EC         __4     P                success
+  157 000000EC B402            PUSH             {R1}
+  158 000000EE 49BD            LDR              R1,=success
+  159 000000F0 F7FF FFFE       BL               printf
+  160 000000F4 BC02            POP              {R1}
+  297 000000F6 E005            B                print_status
+  298 000000F8         handle_fail
+  299 000000F8         __3     P                failure
+  157 000000F8 B402            PUSH             {R1}
+  158 000000FA 49BB            LDR              R1,=failure
+  159 000000FC F7FF FFFE       BL               printf
+  160 00000100 BC02            POP              {R1}
+  300 00000102 E7FF            B                print_status
+  301 00000104         print_status
+  302 00000104         __2     PUSH_STATUS      R0,R1
+
+
+
+ARM Macro Assembler    Page 8 Program Title for Listing Header Goes Here
+
+
+  147 00000104 7C48            LDRB             R0,[R1,#NUM_ENQD]
+  148 00000106 B401            PUSH             {R0}
+  149 00000108 6848            LDR              R0,[R1,#OUT_PTR]
+  150 0000010A B401            PUSH             {R0}
+  151 0000010C 6808            LDR              R0,[R1,#IN_PTR]
+  152 0000010E B401            PUSH             {R0}
+  303 00000110 49B6            LDR              R1,=status
+  304 00000112 F7FF FFFE 
+                       __5     BL               printf
+  305 00000116 BD1F    end_handle
+                               POP              {R0-R4,PC}
+  306 00000118                 ENDP
+  307 00000118         
+  308 00000118         
+  309 00000118         ; This subroutine is a printf() clone with the following
+                       
+  310 00000118         ; formats defined:
+  311 00000118         ;    %h: hex
+  312 00000118         ;    %d: decimal
+  313 00000118         ;    %s: string
+  314 00000118         ;    %b: single byte decimal
+  315 00000118         ;    %c: char
+  316 00000118         ; Input Registers:
+  317 00000118         ;    R1: Pointer to the format string
+  318 00000118         ;    N variables on the stack that correspond 
+  319 00000118         ;    to arguments in the format string
+  320 00000118         ; Output (None)
+  321 00000118         ; Modified Registers (None)
+  322 00000118         printf  PROC             {R0-R12}
+  323 00000118         ; Use the memory as a stack
+  324 00000118 B420            PUSH             {R5}
+  325 0000011A 4DB5            LDR              R5,=printf_static
+  326 0000011C 6028            STR              R0,[R5,#0]
+  327 0000011E 6069            STR              R1,[R5,#4]
+  328 00000120 60AA            STR              R2,[R5,#8]
+  329 00000122 60EB            STR              R3,[R5,#12]
+  330 00000124 612C            STR              R4,[R5,#16]
+  331 00000126 BC20            POP              {R5}
+  332 00000128         
+  333 00000128         ; Store the return pointer
+  334 00000128 B500            PUSH             {LR}
+  335 0000012A BC10            POP              {R4}
+  336 0000012C         
+  337 0000012C 780A    printf_loop
+                               LDRB             R2,[R1,#0]
+  338 0000012E 4212            TST              R2,R2
+  339 00000130 D032            BEQ              printf_end  ;  End of string
+  340 00000132 2A25            CMP              R2,#'%'     ; Format character
+  341 00000134 D003            BEQ              printf_fmt
+  342 00000136 0010            MOVS             R0,R2
+  343 00000138 F7FF FFFE       BL               PutChar
+  344 0000013C E02A            B                printf_continue
+  345 0000013E 1C49    printf_fmt
+                               ADDS             R1,R1,#1
+  346 00000140 780A            LDRB             R2,[R1,#0]
+  347 00000142 2A68            CMP              R2,#'h'     ; Print a hex strin
+                                                            g
+  348 00000144 D00F            BEQ              printf_h
+  349 00000146 2A64            CMP              R2,#'d'     ; Print a decimal s
+
+
+
+ARM Macro Assembler    Page 9 Program Title for Listing Header Goes Here
+
+
+                                                            tring
+  350 00000148 D011            BEQ              printf_d
+  351 0000014A 2A73            CMP              R2,#'s'     ; Print a string
+  352 0000014C D013            BEQ              printf_s
+  353 0000014E 2A63            CMP              R2,#'c'
+  354 00000150 D01C            BEQ              printf_c
+  355 00000152 2A62            CMP              R2,#'b'     ; Print a single by
+                                                            te
+  356 00000154 D016            BEQ              printf_b
+  357 00000156         ; INVALID FORMAT STRING
+  358 00000156         ; Print the error string
+  359 00000156 B420            PUSH             {R5}
+  360 00000158 6869            LDR              R1,[R5,#4]
+  361 0000015A BC20            POP              {R5}
+  362 0000015C         
+  363 0000015C B402            PUSH             {R1}
+  364 0000015E 49A5            LDR              R1,=invalid
+  365 00000160 F7FF FFFE       BL               printf
+  366 00000164 E7FE            B                .           ; Invalid format st
+                                                            ring (STOP)
+  367 00000166         printf_h                             ; Print the current
+                                                             number in R0
+  368 00000166 BC01            POP              {R0}
+  369 00000168 F7FF FFFE       BL               PutNumHex
+  370 0000016C E012            B                printf_continue
+  371 0000016E         printf_d                             ; Print the current
+                                                             digit in R0
+  372 0000016E BC01            POP              {R0}
+  373 00000170 F7FF FFFE       BL               PutNumU
+  374 00000174 E00E            B                printf_continue
+  375 00000176         printf_s                             ; Print the string 
+                                                            in R0
+  376 00000176 BC01            POP              {R0}
+  377 00000178 B402            PUSH             {R1}
+  378 0000017A 2164            MOVS             R1,#100     ; Max string length
+                                                             of 100
+  379 0000017C F7FF FFFE       BL               PutStringSB
+  380 00000180 BC02            POP              {R1}
+  381 00000182 E007            B                printf_continue
+  382 00000184         printf_b                             ; Print the single 
+                                                            byte value in R0
+  383 00000184 BC01            POP              {R0}
+  384 00000186 F7FF FFFE       BL               PutNumUB
+  385 0000018A E003            B                printf_continue
+  386 0000018C         printf_c                             ; Print the single 
+                                                            char value in R0
+  387 0000018C BC01            POP              {R0}
+  388 0000018E F7FF FFFE       BL               PutChar
+  389 00000192 E7FF            B                printf_continue
+  390 00000194 1C49    printf_continue
+                               ADDS             R1,R1,#1
+  391 00000196 E7C9            B                printf_loop
+  392 00000198         printf_end                           ; Restore the link 
+                                                            register
+  393 00000198 B410            PUSH             {R4}
+  394 0000019A         
+  395 0000019A         ; Restore PUSH'ed variables
+  396 0000019A B420            PUSH             {R5}
+  397 0000019C 4D94            LDR              R5,=printf_static
+
+
+
+ARM Macro Assembler    Page 10 Program Title for Listing Header Goes Here
+
+
+  398 0000019E 6828            LDR              R0,[R5,#0]
+  399 000001A0 6869            LDR              R1,[R5,#4]
+  400 000001A2 68AA            LDR              R2,[R5,#8]
+  401 000001A4 68EB            LDR              R3,[R5,#12]
+  402 000001A6 692C            LDR              R4,[R5,#16]
+  403 000001A8 BC20            POP              {R5}
+  404 000001AA         
+  405 000001AA BD00            POP              {PC}
+  406 000001AC                 ENDP
+  407 000001AC         
+  408 000001AC         ; Initialize a queue structure with the
+  409 000001AC         ; following parameters
+  410 000001AC         ; Input
+  411 000001AC         ;   R0: Pointer to the first address of the circular buf
+                       fer
+  412 000001AC         ;   R1: Pointer to the start of the queue structure
+  413 000001AC         ;   R2: Size of the circular buffer pointed to by R0
+  414 000001AC         ; Output (None)
+  415 000001AC         ; Modified Registers (None)
+  416 000001AC         InitQueue
+                               PROC             {R0-R12}
+  417 000001AC B407            PUSH             {R0-R2}
+  418 000001AE 6008            STR              R0,[R1,#IN_PTR]
+  419 000001B0 6048            STR              R0,[R1,#OUT_PTR]
+  420 000001B2 6088            STR              R0,[R1,#BUF_STRT]
+  421 000001B4 1880            ADDS             R0,R0,R2
+  422 000001B6 60C8            STR              R0,[R1,#BUF_PAST]
+  423 000001B8 740A            STRB             R2,[R1,#BUF_SIZE]
+  424 000001BA 2000            MOVS             R0,#0
+  425 000001BC 7448            STRB             R0,[R1,#NUM_ENQD]
+  426 000001BE BC07            POP              {R0-R2}
+  427 000001C0 4770            BX               LR
+  428 000001C2                 ENDP
+  429 000001C2         
+  430 000001C2         ;If the queue (whose queue record structure?s address is
+                        in R1) is not full, enqueues the 
+  431 000001C2         ;character from R0 to the queue and reports success by r
+                       eturning with the C flag 
+  432 000001C2         ;cleared, (i.e., 0); otherwise only reports failure by r
+                       eturning with the C flag set, (i.e., 1). 
+  433 000001C2         ; Input:  R0:  Character to enqueue
+  434 000001C2         ;         R1:  Address of queue record structure
+  435 000001C2         ; Output:  PSR C flag:  Success(0) or Failure (1)
+  436 000001C2         ; Modify:  APSR
+  437 000001C2         ; All other registers remain unchanged on return
+  438 000001C2         Enqueue PROC             {R0-R12}
+  439 000001C2 B40C            PUSH             {R2,R3}
+  440 000001C4 7C4A            LDRB             R2,[R1,#NUM_ENQD]
+  441 000001C6 7C0B            LDRB             R3,[R1,#BUF_SIZE]
+  442 000001C8 429A            CMP              R2,R3       ; Check if the queu
+                                                            e is full
+  443 000001CA DA11            BGE              en_full
+  444 000001CC 680B            LDR              R3,[R1,#IN_PTR]
+  445 000001CE 7018            STRB             R0,[R3,#0]  ; Put new element a
+                                                            t memory location p
+                                                            ointed by InPointer
+                                                            
+  446 000001D0         ; Increment NumberEnqueued
+  447 000001D0 1C52            ADDS             R2,R2,#1
+
+
+
+ARM Macro Assembler    Page 11 Program Title for Listing Header Goes Here
+
+
+  448 000001D2 744A            STRB             R2,[R1,#NUM_ENQD]
+  449 000001D4         
+  450 000001D4         ; Increment InPointer
+  451 000001D4 1C5B            ADDS             R3,R3,#1
+  452 000001D6 68CA            LDR              R2,[R1,#BUF_PAST]
+  453 000001D8 4293            CMP              R3,R2
+  454 000001DA DB00            BLT              en_str      ; If (R1->in_ptr < 
+                                                            R1->BUF_PAST) goto 
+                                                            en_str
+  455 000001DC         ; IN_PTR is past the end of the queue
+  456 000001DC         ; We need to set it back to the start of the queue
+  457 000001DC 688B            LDR              R3,[R1,#BUF_STRT]
+  458 000001DE 600B    en_str  STR              R3,[R1,#IN_PTR]
+  459 000001E0         ; Clear the carry flag  (No error occured)
+  460 000001E0 F3EF 8200       MRS              R2,APSR
+  461 000001E4 2320            MOVS             R3,#0x20
+  462 000001E6 061B            LSLS             R3,R3,#24
+  463 000001E8 439A            BICS             R2,R2,R3
+  464 000001EA F382 8800       MSR              APSR,R2
+  465 000001EE E006            B                en_done     ; Don't clear the A
+                                                            PSR C-flag
+  466 000001F0         en_full                              ; Set the carry fla
+                                                            g  (Error occured)
+  467 000001F0 F3EF 8200       MRS              R2,APSR
+  468 000001F4 2320            MOVS             R3,#0x20
+  469 000001F6 061B            LSLS             R3,R3,#24
+  470 000001F8 431A            ORRS             R2,R2,R3
+  471 000001FA F382 8800       MSR              APSR,R2
+  472 000001FE BC0C    en_done POP              {R2,R3}
+  473 00000200 4770            BX               LR
+  474 00000202                 ENDP
+  475 00000202         
+  476 00000202         ;If the queue (whose queue record structure?s address is
+                        in R1) is not empty, dequeues  
+  477 00000202         ;a character from the queue to R0 and reports success by
+                        returning with the Cflag 
+  478 00000202         ;cleared, (i.e., 0)
+  479 00000202         ; otherwise only reports failure by returning with the C
+                       flag set, (i.e., 1). 
+  480 00000202         ; Input:  R1:  Address of queue record structure 
+  481 00000202         ; Output: R0:  Character dequeued 
+  482 00000202         ;         PSR C flag:  Success(0) or Failure (1)
+  483 00000202         ; Modify: R0
+  484 00000202         ; APSR 
+  485 00000202         ; All other registers remain unchanged on return
+  486 00000202         Dequeue PROC             {R1-R12}
+  487 00000202 B41C            PUSH             {R2-R4}
+  488 00000204 7C4A            LDRB             R2,[R1,#NUM_ENQD] 
+                                                            ; R2 = NUM_ENQ
+  489 00000206 684B            LDR              R3,[R1,#OUT_PTR] ; R3 = OUT_PTR
+                                                            
+  490 00000208 2A00            CMP              R2,#0
+  491 0000020A DD10            BLE              de_empty    ; No more items in 
+                                                            the queue
+  492 0000020C 7818            LDRB             R0,[R3,#0]  ; Get item at OUT_P
+                                                            TR
+  493 0000020E         ; Decrement number enqueued
+  494 0000020E 1E52            SUBS             R2,R2,#1
+  495 00000210 744A            STRB             R2,[R1,#NUM_ENQD]
+
+
+
+ARM Macro Assembler    Page 12 Program Title for Listing Header Goes Here
+
+
+  496 00000212         
+  497 00000212         ; Increment OutPointer
+  498 00000212 1C5B            ADDS             R3,R3,#1
+  499 00000214 68CC            LDR              R4,[R1,#BUF_PAST]
+  500 00000216 42A3            CMP              R3,R4
+  501 00000218 DB00            BLT              de_str      ; If (R1->out_ptr <
+                                                             R1->BUF_PAST) goto
+                                                             de_str
+  502 0000021A         ; OUT_PTR is past the end of the queue
+  503 0000021A         ; We need to set it back to the start of the queue
+  504 0000021A 688B            LDR              R3,[R1,#BUF_STRT]
+  505 0000021C 604B    de_str  STR              R3,[R1,#OUT_PTR]
+  506 0000021E         ; Clear the carry flag (No error occured)
+  507 0000021E F3EF 8200       MRS              R2,APSR
+  508 00000222 2320            MOVS             R3,#0x20
+  509 00000224 061B            LSLS             R3,R3,#24
+  510 00000226 439A            BICS             R2,R2,R3
+  511 00000228 F382 8800       MSR              APSR,R2
+  512 0000022C E006            B                de_done
+  513 0000022E         de_empty                             ; Set the carry fla
+                                                            g (Error occured)
+  514 0000022E F3EF 8200       MRS              R2,APSR
+  515 00000232 2320            MOVS             R3,#0x20
+  516 00000234 061B            LSLS             R3,R3,#24
+  517 00000236 431A            ORRS             R2,R2,R3
+  518 00000238 F382 8800       MSR              APSR,R2
+  519 0000023C BC1C    de_done POP              {R2-R4}
+  520 0000023E 4770            BX               LR
+  521 00000240                 ENDP
+  522 00000240         
+  523 00000240         
+  524 00000240         ; Print a number in hex
+  525 00000240         ; Input parameter:
+  526 00000240         ;   R0: number to print in hexadecimal (unsigned word va
+                       lue)
+  527 00000240         ; Output parameter: (none)
+  528 00000240         PutNumHex
+                               PROC             {R0-R12}
+  529 00000240 0000000F 
+                       RIGHT_NIBBLE_MASK
+                               EQU              0x0F
+  530 00000240 B51F            PUSH             {R0-R4,LR}
+  531 00000242         ; There are 4 bytes to print
+  532 00000242 2100            MOVS             R1,#0       ; Use R1 as an iter
+                                                            ator
+  533 00000244 2318            MOVS             R3,#24
+  534 00000246 240F            MOVS             R4,#RIGHT_NIBBLE_MASK
+  535 00000248 41D8            RORS             R0,R0,R3    ; Move the MSB to t
+                                                            he LSB
+  536 0000024A 2904    pnh_loop
+                               CMP              R1,#4
+  537 0000024C DA0A            BGE              pnh_done
+  538 0000024E         ; Print the most significant nibble
+  539 0000024E 0902            LSRS             R2,R0,#4
+  540 00000250 4022            ANDS             R2,R2,R4
+  541 00000252 F7FF FFFE       BL               PutDigHex   ; Print this digit
+  542 00000256         ; Print the least significant nibble
+  543 00000256 0002            MOVS             R2,R0
+  544 00000258 4022            ANDS             R2,R2,R4
+
+
+
+ARM Macro Assembler    Page 13 Program Title for Listing Header Goes Here
+
+
+  545 0000025A F7FF FFFE       BL               PutDigHex
+  546 0000025E 41D8            RORS             R0,R0,R3    ; Move to the next 
+                                                            byte
+  547 00000260 1C49            ADDS             R1,R1,#1    ; i++
+  548 00000262 E7F2            B                pnh_loop
+  549 00000264 BD1F    pnh_done
+                               POP              {R0-R4,PC}
+  550 00000266                 ENDP
+  551 00000266         
+  552 00000266         ; Print a single hex digit
+  553 00000266         ; stored in R2
+  554 00000266         ; Input parameter
+  555 00000266         PutDigHex
+                               PROC             {R0-R12}
+  556 00000266 0000000A 
+                       ASCII_LETTER
+                               EQU              10          ; Any values greate
+                                                            r than or equal to 
+                                                            this will be a lett
+                                                            er A-F
+  557 00000266 00000030 
+                       ASCII_DIG_OFF
+                               EQU              '0'
+  558 00000266 00000039 
+                       ASCII_DIG_LAST
+                               EQU              '9'
+  559 00000266 00000007 
+                       ASCII_LET_OFF
+                               EQU              ('A' - '0' - 10)
+  560 00000266 B50D            PUSH             {R0,R2,R3,LR}
+  561 00000268 23FF            MOVS             R3,#0xFF
+  562 0000026A 401A            ANDS             R2,R2,R3
+  563 0000026C 3230            ADDS             R2,#ASCII_DIG_OFF
+  564 0000026E 2A39            CMP              R2,#ASCII_DIG_LAST
+  565 00000270 DB00            BLT              put_dig
+  566 00000272 1DD2            ADDS             R2,R2,#ASCII_LET_OFF
+  567 00000274 0010    put_dig MOVS             R0,R2
+  568 00000276 F7FF FFFE       BL               PutChar
+  569 0000027A BD0D            POP              {R0,R2,R3,PC}
+  570 0000027C                 ENDP
+  571 0000027C         
+  572 0000027C         ; Prints to the terminal screen the decimal representati
+                       on of the
+  573 0000027C         ; unsigned byte value in R0
+  574 0000027C         ; Input parameter:
+  575 0000027C         ;   R0:number to print in decimal (unsigned byte value)
+  576 0000027C         ;Output parameter: (none)
+  577 0000027C         PutNumUB
+                               PROC             {R0-R12}
+  578 0000027C B503            PUSH             {R0,R1,LR}
+  579 0000027E 21FF            MOVS             R1,#BYTE_MASK
+  580 00000280 4008            ANDS             R0,R0,R1
+  581 00000282 F7FF FFFE       BL               PutNumU
+  582 00000286 BD03            POP              {R0,R1,PC}
+  583 00000288                 ENDP
+  584 00000288         
+  585 00000288         ; Print a number in decimal using the ascii
+  586 00000288         ; characters
+  587 00000288         ; SUBROUTINES USED
+
+
+
+ARM Macro Assembler    Page 14 Program Title for Listing Header Goes Here
+
+
+  588 00000288         ;   - PutChar (Print each digit)
+  589 00000288         ;   - DIVU
+  590 00000288         ; PARAMS
+  591 00000288         ;   INPUT R0: Number to print (unsigned word value)
+  592 00000288         ;   OUTPUT  : NONE
+  593 00000288         PutNumU PROC             {R0-R12}
+  594 00000288 B507            PUSH             {R0-R2,LR}
+  595 0000028A 0000000A 
+                       printbase
+                               EQU              10
+  596 0000028A 00000030 
+                       asciioffset
+                               EQU              '0'
+  597 0000028A         ; put_num_u(U32 r0)
+  598 0000028A         ; while (r0 != 0)
+  599 0000028A         ;   (add r0 % 10 to stack)
+  600 0000028A         ;   r0 /= 10
+  601 0000028A         ; print the stack backwards
+  602 0000028A 2800            CMP              R0,#0       ; Just print a '0'
+  603 0000028C D011            BEQ              numzero
+  604 0000028E         
+  605 0000028E 2200            MOVS             R2,#0       ; Count the number 
+                                                            of digits
+  606 00000290 2800    numwhile
+                               CMP              R0,#0       ; while (r0 != 0)
+  607 00000292 D005            BEQ              numwhile2
+  608 00000294 210A            MOVS             R1,#printbase ; Always divide b
+                                                            y the base
+  609 00000296 F7FF FFFE       BL               DIVU        ; R0 = R0 / base; R
+                                                            0 % base
+  610 0000029A B402            PUSH             {R1}        ; Need to print the
+                                                            se digits backwards
+                                                            
+  611 0000029C 1C52            ADDS             R2,R2,#1    ; r2++
+  612 0000029E E7F7            B                numwhile
+  613 000002A0 2A01    numwhile2
+                               CMP              R2,#1       ; while (r2 >= 1)
+  614 000002A2 DB09            BLT              numdone
+  615 000002A4 BC02            POP              {R1}
+  616 000002A6 0008            MOVS             R0,R1
+  617 000002A8 3030            ADDS             R0,R0,#asciioffset ; Print the 
+                                                            next character (asc
+                                                            ii not just value)
+  618 000002AA 1E52            SUBS             R2,R2,#1
+  619 000002AC F7FF FFFE       BL               PutChar
+  620 000002B0 E7F6            B                numwhile2
+  621 000002B2 2030    numzero MOVS             R0,#'0'
+  622 000002B4 F7FF FFFE       BL               PutChar
+  623 000002B8 BD07    numdone POP              {R0-R2,PC}
+  624 000002BA                 ENDP
+  625 000002BA         
+  626 000002BA         ; Calculate the quotient and remainder of
+  627 000002BA         ; two unsigned word values.
+  628 000002BA         ; SUBROUTINES: None
+  629 000002BA         ; PARAMS:
+  630 000002BA         ;   INPUT R0: dividend (unsigned word)
+  631 000002BA         ;   INPUT R1: divisor  (unsigned word)
+  632 000002BA         ;   OUTPUT R0: quotient (unsigned word)
+  633 000002BA         ;   OUTPUT R1: remainder (unsigned word)
+
+
+
+ARM Macro Assembler    Page 15 Program Title for Listing Header Goes Here
+
+
+  634 000002BA         DIVU    PROC             {R2-R12}
+  635 000002BA B500            PUSH             {LR}
+  636 000002BC B4FC            PUSH             {R2-R7}
+  637 000002BE 2900            CMP              R1,#0
+  638 000002C0 D01D            BEQ              DIVU_0      ; Don't try to divi
+                                                            de by zero
+  639 000002C2 00000080 
+                       LEFT_MASK
+                               EQU              0x80        ; Used to get most 
+                                                            significant bit of 
+                                                            a byte
+  640 000002C2 0000001F 
+                       SHIFT32 EQU              31
+  641 000002C2         ; Compute N / D
+  642 000002C2         ; Use binary long division
+  643 000002C2         ; R = 0 (Use R2)
+  644 000002C2         ; Q = 0 (Use R3)
+  645 000002C2         ; for (i = 31; i >= 0; i--) {
+  646 000002C2         ;   R = R << 1
+  647 000002C2         ;   R |= (N & LEFT_MASK) >> 31
+  648 000002C2         ;   N = N << 1
+  649 000002C2         ;   if R >= D {
+  650 000002C2         ;       R = R - D
+  651 000002C2         ;       Q |= 1 << i
+  652 000002C2         ;   }
+  653 000002C2         ; }
+  654 000002C2 2200            MOVS             R2,#0       ; Init Remainder
+  655 000002C4 2300            MOVS             R3,#0       ; Init the Quotient
+                                                            
+  656 000002C6 241F            MOVS             R4,#SHIFT32 ; Init the iterator
+                                                             (i)
+  657 000002C8 2601            MOVS             R6,#1       ; Used for Q = Q | 
+                                                            (1 << i)
+  658 000002CA 2C00    DIV_FOR CMP              R4,#0       ; if (i >= 0)
+  659 000002CC DB0D            BLT              DIVU_FINISH ; Finished loop
+  660 000002CE 0052            LSLS             R2,R2,#1    ; R = R << 1
+  661 000002D0 0FC5            LSRS             R5,R0,#SHIFT32 ; R5 = most sign
+                                                            ificant bit in N
+  662 000002D2 2601            MOVS             R6,#1
+  663 000002D4 4035            ANDS             R5,R5,R6    ; R5 = (N & LEFT_MA
+                                                            SK) >> 31
+  664 000002D6 432A            ORRS             R2,R2,R5    ; R |= (N & LEFT_MA
+                                                            SK) >> 31
+  665 000002D8 0040            LSLS             R0,R0,#1    ; N = N << 1
+  666 000002DA 428A            CMP              R2,R1       ; if (R >= D)
+  667 000002DC D303            BLO              DIV_ITER    ; continue;
+  668 000002DE 1A52            SUBS             R2,R2,R1    ; R = R - D
+  669 000002E0 40A6            LSLS             R6,R6,R4    ; R6 = 1 << i
+  670 000002E2 0035            MOVS             R5,R6
+  671 000002E4 432B            ORRS             R3,R3,R5    ; Q = Q | (1 << i)
+  672 000002E6 1E64    DIV_ITER
+                               SUBS             R4,R4,#1    ; i--
+  673 000002E8 E7EF            B                DIV_FOR     ; For loop
+  674 000002EA 0018    DIVU_FINISH
+                               MOVS             R0,R3       ; Set the outputs
+  675 000002EC 0011            MOVS             R1,R2       ;
+  676 000002EE         ; Clear the carry flag
+  677 000002EE F3EF 8200       MRS              R2,APSR
+  678 000002F2 2320            MOVS             R3,#0x20
+
+
+
+ARM Macro Assembler    Page 16 Program Title for Listing Header Goes Here
+
+
+  679 000002F4 061B            LSLS             R3,R3,#24
+  680 000002F6 439A            BICS             R2,R2,R3
+  681 000002F8 F382 8800       MSR              APSR,R2
+  682 000002FC E007            B                DIVU_STOP
+  683 000002FE 2301    DIVU_0  MOVS             R3,#1       ; Init R3 as 1
+  684 00000300         ; Set the carry flag
+  685 00000300 F3EF 8200       MRS              R2,APSR
+  686 00000304 2320            MOVS             R3,#0x20
+  687 00000306 061B            LSLS             R3,R3,#24
+  688 00000308 431A            ORRS             R2,R2,R3
+  689 0000030A F382 8800       MSR              APSR,R2
+  690 0000030E BCFC    DIVU_STOP
+                               POP              {R2-R7}
+  691 00000310 BD00            POP              {PC}
+  692 00000312                 ENDP
+  693 00000312         
+  694 00000312         
+  695 00000312         ; PutChar will print a character to the terminal
+  696 00000312         ; Input: R0 (character to print)
+  697 00000312         ; Output; None
+  698 00000312         ; Register modification list: R1-R3
+  699 00000312         PutChar PROC             {R0-R12}
+  700 00000312 B40E            PUSH             {R1-R3}
+  701 00000314         
+  702 00000314         ; Wait until last character has been sent
+  703 00000314         ;Set Z if TDRE=0
+  704 00000314 493C            LDR              R1,=UART0_BASE
+  705 00000316 2280            MOVS             R2,#UART0_S1_TDRE_MASK
+  706 00000318 790B    putchar_l
+                               LDRB             R3,[R1,#UART0_S1_OFFSET]
+  707 0000031A 421A            TST              R2,R3
+  708 0000031C D0FC            BEQ              putchar_l
+  709 0000031E         
+  710 0000031E         ; Write the character to the terminal
+  711 0000031E 71C8            STRB             R0,[R1,#UART0_D_OFFSET]
+  712 00000320         
+  713 00000320 BC0E            POP              {R1-R3}
+  714 00000322 4770            BX               LR
+  715 00000324                 ENDP
+  716 00000324         
+  717 00000324         ; GetChar will real a character from the terminal
+  718 00000324         ; Input: None
+  719 00000324         ; Output; R0 (character read from terminal)
+  720 00000324         ; Register modification list: R1-R3
+  721 00000324         GetChar PROC             {R1-R12}
+  722 00000324 B40E            PUSH             {R1-R3}
+  723 00000326         
+  724 00000326         ; Wait until a character is ready
+  725 00000326         ;Set Z if RDRF=0
+  726 00000326 4938            LDR              R1,=UART0_BASE
+  727 00000328 2220            MOVS             R2,#UART0_S1_RDRF_MASK
+  728 0000032A 790B    getchar_l
+                               LDRB             R3,[R1,#UART0_S1_OFFSET]
+  729 0000032C 421A            TST              R2,R3
+  730 0000032E D0FC            BEQ              getchar_l
+  731 00000330         
+  732 00000330         ; Read the value from the data register
+  733 00000330 79C8            LDRB             R0,[R1,#UART0_D_OFFSET]
+  734 00000332         
+
+
+
+ARM Macro Assembler    Page 17 Program Title for Listing Header Goes Here
+
+
+  735 00000332 BC0E            POP              {R1-R3}
+  736 00000334 4770            BX               LR
+  737 00000336                 ENDP
+  738 00000336         
+  739 00000336         ; Print a NULL terminated string
+  740 00000336         ; SUBROUTINES USED
+  741 00000336         ;   - PutChar (Print each character)
+  742 00000336         ; PARAMS
+  743 00000336         ;   INPUT R0: pointer to the target string (word address
+                       )
+  744 00000336         ;   INPUT R1: size of the string buffer so that to not o
+                       verflow (unsigned word value)
+  745 00000336         ;   OUTPUT  : NONE
+  746 00000336         PutStringSB
+                               PROC             {R0-R12}
+  747 00000336 B51F            PUSH             {R0-R4,LR}
+  748 00000338         ; put_string_sb(char* r0, size_t r1)
+  749 00000338         ;   iter = r0
+  750 00000338         ;   while (*iter && iter - r0 < r1 - 1)
+  751 00000338         ;       printf("%c", *iter)
+  752 00000338         ;       iter++
+  753 00000338 0002            MOVS             R2,R0       ; iter = r0
+  754 0000033A 0004            MOVS             R4,R0       ; start = r0 (r0 ne
+                                                            eds to be used for 
+                                                            printing)
+  755 0000033C 1E49            SUBS             R1,R1,#1
+  756 0000033E         
+  757 0000033E 7813    putwhile
+                               LDRB             R3,[R2,#0]  ; r3 = *iter
+  758 00000340 2B00            CMP              R3,#0       ; if (!*r3) break
+  759 00000342 D007            BEQ              putdone
+  760 00000344 1B13            SUBS             R3,R2,R4
+  761 00000346 428B            CMP              R3,R1       ; if (iter - start 
+                                                            >= r1 - 1) break
+  762 00000348 DA04            BGE              putdone
+  763 0000034A 7810            LDRB             R0,[R2,#0]  ; r0 = *iter
+  764 0000034C F7FF FFFE       BL               PutChar     ; printf("%c", *ite
+                                                            r);
+  765 00000350 1C52            ADDS             R2,R2,#1    ; iter++
+  766 00000352 E7F4            B                putwhile
+  767 00000354 BD1F    putdone POP              {R0-R4,PC}
+  768 00000356                 ENDP
+  769 00000356         
+  770 00000356         ; Initialize the UART0 serial polling with
+  771 00000356         ; 8 databits, no parity, one stop bit
+  772 00000356         ; Input: None
+  773 00000356         ; Output: None
+  774 00000356         ; Register modification: R0-R2
+  775 00000356         Init_UART0_Polling
+                               PROC             {R3-R12}
+  776 00000356 B407            PUSH             {R0-R2}
+  777 00000358         ; Select/configure UART0 sources
+  778 00000358 04000000 
+                       SIM_SOPT2_UART0SRC_MCGFLLCLK
+                               EQU              (1 << SIM_SOPT2_UART0SRC_SHIFT)
+  779 00000358         ; Set the UART0 clock to 48 MHz
+  780 00000358 482C            LDR              R0,=SIM_SOPT2
+  781 0000035A 492D            LDR              R1,=SIM_SOPT2_UART0SRC_MASK
+  782 0000035C 6802            LDR              R2,[R0,#0]  ;current SIM_SOPT2v
+
+
+
+ARM Macro Assembler    Page 18 Program Title for Listing Header Goes Here
+
+
+                                                            alue
+  783 0000035E 438A            BICS             R2,R2,R1    ;only UART0SRCbits 
+                                                            cleared
+  784 00000360 492C            LDR              R1,=SIM_SOPT2_UART0SRC_MCGFLLCL
+K
+  785 00000362 430A            ORRS             R2,R2,R1    ;only UART0 bits ch
+                                                            anged
+  786 00000364 6002            STR              R2,[R0,#0]  ;update SIM_SOPT2
+  787 00000366         
+  788 00000366         ; Set SIM_SOPT5 for UART0 External
+  789 00000366 00010005 
+                       SIM_SOPT5_UART0_EXTERN_MASK_CLEAR
+                               EQU              (SIM_SOPT5_UART0ODE_MASK :OR: S
+IM_SOPT5_UART0RXSRC_MASK :OR: SIM_SOPT5_UART0TXSRC_MASK)
+  790 00000366 482C            LDR              R0,=SIM_SOPT5
+  791 00000368 492C            LDR              R1,=SIM_SOPT5_UART0_EXTERN_MASK
+_CLEAR
+  792 0000036A 6802            LDR              R2,[R0,#0]  ;current SIM_SOPT5v
+                                                            alue
+  793 0000036C 438A            BICS             R2,R2,R1    ;only UART0 bits cl
+                                                            eared
+  794 0000036E 6002            STR              R2,[R0,#0]  ;update SIM_SOPT5
+  795 00000370         
+  796 00000370         ; Enable clocks for UART0 and Port B
+  797 00000370         ; Enable UART0 clocks
+  798 00000370 482B            LDR              R0,=SIM_SCGC4
+  799 00000372 492C            LDR              R1,=SIM_SCGC4_UART0_MASK
+  800 00000374 6802            LDR              R2,[R0,#0]  ;current SIM_SCGC4v
+                                                            alue
+  801 00000376 430A            ORRS             R2,R2,R1    ;only UART0bit set
+  802 00000378 6002            STR              R2,[R0,#0]  ;update SIM_SCGC4
+  803 0000037A         
+  804 0000037A         ; Set SIM_CGC5 for Port B Clock Enabled
+  805 0000037A 482B            LDR              R0,=SIM_SCGC5
+  806 0000037C 4929            LDR              R1,=SIM_SCGC5_PORTB_MASK
+  807 0000037E 6802            LDR              R2,[R0,#0]  ;current SIM_SCGC5v
+                                                            alue
+  808 00000380 430A            ORRS             R2,R2,R1    ;only PORTBbit set
+  809 00000382 6002            STR              R2,[R0,#0]  ;update SIM_SCGC5
+  810 00000384         
+  811 00000384         ; Select Port B mux pins to connect to UART0
+  812 00000384 01000200 
+                       PORT_PCR_SET_PTB2_UART0_RX
+                               EQU              (PORT_PCR_ISF_MASK :OR: PORT_PC
+R_MUX_SELECT_2_MASK)
+  813 00000384 01000200 
+                       PORT_PCR_SET_PTB1_UART0_TX
+                               EQU              (PORT_PCR_ISF_MASK :OR: PORT_PC
+R_MUX_SELECT_2_MASK)
+  814 00000384         
+  815 00000384 4829            LDR              R0,=PORTB_PCR2
+  816 00000386 492A            LDR              R1,=PORT_PCR_SET_PTB2_UART0_RX
+  817 00000388 6001            STR              R1,[R0,#0]  ;Port B pin 2 conne
+                                                            cts to UART0 Rx
+  818 0000038A 482A            LDR              R0,=PORTB_PCR1
+  819 0000038C 4928            LDR              R1,=PORT_PCR_SET_PTB1_UART0_TX
+  820 0000038E 6001            STR              R1,[R0,#0]  ;Port B pin 1 conne
+                                                            cts to UART0 Tx
+  821 00000390         
+
+
+
+ARM Macro Assembler    Page 19 Program Title for Listing Header Goes Here
+
+
+  822 00000390         ; Configure UART0 (register initialization)
+  823 00000390         ; Load base addr for UART0
+  824 00000390 481D            LDR              R0,=UART0_BASE
+  825 00000392         
+  826 00000392         ; Disable UART0
+  827 00000392         
+  828 00000392         
+  829 00000392 210C            MOVS             R1,#UART0_C2_T_R
+  830 00000394 78C2            LDRB             R2,[R0,#UART0_C2_OFFSET]
+  831 00000396 438A            BICS             R2,R2,R1
+  832 00000398 70C2            STRB             R2,[R0,#UART0_C2_OFFSET]
+  833 0000039A         
+  834 0000039A         ; Set UART0 baud rate?BDH before BDL
+  835 0000039A 2101            MOVS             R1,#UART0_BDH_9600
+  836 0000039C 7001            STRB             R1,[R0,#UART0_BDH_OFFSET]
+  837 0000039E 2138            MOVS             R1,#UART0_BDL_9600
+  838 000003A0 7041            STRB             R1,[R0,#UART0_BDL_OFFSET]
+  839 000003A2         
+  840 000003A2         ; Set UART0 character format for serial bit stream and c
+                       lear flags
+  841 000003A2 2100            MOVS             R1,#UART0_C1_8N1
+  842 000003A4 7081            STRB             R1,[R0,#UART0_C1_OFFSET]
+  843 000003A6 2100            MOVS             R1,#UART0_C3_NO_TXINV
+  844 000003A8 7181            STRB             R1,[R0,#UART0_C3_OFFSET]
+  845 000003AA 210F            MOVS             R1,#UART0_C4_NO_MATCH_OSR_16
+  846 000003AC 7281            STRB             R1,[R0,#UART0_C4_OFFSET]
+  847 000003AE 2100            MOVS             R1,#UART0_C5_NO_DMA_SSR_SYNC
+  848 000003B0 72C1            STRB             R1,[R0,#UART0_C5_OFFSET]
+  849 000003B2 211F            MOVS             R1,#UART0_S1_CLEAR_FLAGS
+  850 000003B4 7101            STRB             R1,[R0,#UART0_S1_OFFSET]
+  851 000003B6 21C0            MOVS             R1,#UART0_S2_NO_RXINV_BRK10_NO_
+LBKDETECT_CLEAR_FLAGS
+  852 000003B8 7141            STRB             R1,[R0,#UART0_S2_OFFSET]
+  853 000003BA         
+  854 000003BA         ; Enable UART0
+  855 000003BA 210C            MOVS             R1,#UART0_C2_T_R
+  856 000003BC 70C1            STRB             R1,[R0,#UART0_C2_OFFSET]
+  857 000003BE         
+  858 000003BE BC07            POP              {R0-R2}
+  859 000003C0 4770            BX               LR
+  860 000003C2                 ENDP
+  861 000003C2         
+  862 000003C2         ;>>>>>   end subroutine code <<<<<
+  863 000003C2 00 00           ALIGN
+  864 000003C4         ;*******************************************************
+                       *********
+  865 000003C4         ;Vector Table Mapped to Address 0 at Reset
+  866 000003C4         ;Linker requires __Vectors to be exported
+  867 000003C4 00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+
+
+
+ARM Macro Assembler    Page 20 Program Title for Listing Header Goes Here
+
+
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              4006A000 
+              40048004 
+              0C000000 
+              04000000 
+              40048010 
+              00010005 
+              40048034 
+              00000400 
+              40048038 
+              4004A008 
+              01000200 
+              4004A004         AREA             RESET, DATA, READONLY
+  868 00000000                 EXPORT           __Vectors
+  869 00000000                 EXPORT           __Vectors_End
+  870 00000000                 EXPORT           __Vectors_Size
+  871 00000000                 IMPORT           __initial_sp
+  872 00000000                 IMPORT           Dummy_Handler
+  873 00000000                 IMPORT           HardFault_Handler
+  874 00000000         __Vectors
+  875 00000000         ;ARM core vectors
+  876 00000000 00000000        DCD              __initial_sp ;00:end of stack
+  877 00000004 00000000        DCD              Reset_Handler ;01:reset vector
+  878 00000008 00000000        DCD              Dummy_Handler ;02:NMI
+  879 0000000C 00000000        DCD              HardFault_Handler 
+                                                            ;03:hard fault
+  880 00000010 00000000        DCD              Dummy_Handler ;04:(reserved)
+  881 00000014 00000000        DCD              Dummy_Handler ;05:(reserved)
+  882 00000018 00000000        DCD              Dummy_Handler ;06:(reserved)
+  883 0000001C 00000000        DCD              Dummy_Handler ;07:(reserved)
+  884 00000020 00000000        DCD              Dummy_Handler ;08:(reserved)
+  885 00000024 00000000        DCD              Dummy_Handler ;09:(reserved)
+  886 00000028 00000000        DCD              Dummy_Handler ;10:(reserved)
+  887 0000002C 00000000        DCD              Dummy_Handler ;11:SVCall (super
+                                                            visor call)
+  888 00000030 00000000        DCD              Dummy_Handler ;12:(reserved)
+  889 00000034 00000000        DCD              Dummy_Handler ;13:(reserved)
+  890 00000038 00000000        DCD              Dummy_Handler ;14:PendSV (Penda
+                                                            bleSrvReq)
+  891 0000003C         ;   pendable request 
+  892 0000003C         ;   for system service)
+  893 0000003C 00000000        DCD              Dummy_Handler ;15:SysTick (syst
+                                                            em tick timer)
+  894 00000040 00000000        DCD              Dummy_Handler ;16:DMA channel 0
+                                                             transfer 
+  895 00000044         ;   complete/error
+  896 00000044 00000000        DCD              Dummy_Handler ;17:DMA channel 1
+                                                             transfer
+  897 00000048         ;   complete/error
+  898 00000048 00000000        DCD              Dummy_Handler ;18:DMA channel 2
+                                                             transfer
+  899 0000004C         ;   complete/error
+  900 0000004C 00000000        DCD              Dummy_Handler ;19:DMA channel 3
+                                                             transfer
+
+
+
+ARM Macro Assembler    Page 21 Program Title for Listing Header Goes Here
+
+
+  901 00000050         ;   complete/error
+  902 00000050 00000000        DCD              Dummy_Handler ;20:(reserved)
+  903 00000054 00000000        DCD              Dummy_Handler ;21:FTFA command 
+                                                            complete/
+  904 00000058         ;   read collision
+  905 00000058 00000000        DCD              Dummy_Handler ;22:low-voltage d
+                                                            etect;
+  906 0000005C         ;   low-voltage warning
+  907 0000005C 00000000        DCD              Dummy_Handler ;23:low leakage w
+                                                            akeup
+  908 00000060 00000000        DCD              Dummy_Handler ;24:I2C0
+  909 00000064 00000000        DCD              Dummy_Handler ;25:(reserved)
+  910 00000068 00000000        DCD              Dummy_Handler ;26:SPI0
+  911 0000006C 00000000        DCD              Dummy_Handler ;27:(reserved)
+  912 00000070 00000000        DCD              Dummy_Handler ;28:UART0 (status
+                                                            ; error)
+  913 00000074 00000000        DCD              Dummy_Handler ;29:(reserved)
+  914 00000078 00000000        DCD              Dummy_Handler ;30:(reserved)
+  915 0000007C 00000000        DCD              Dummy_Handler ;31:ADC0
+  916 00000080 00000000        DCD              Dummy_Handler ;32:CMP0
+  917 00000084 00000000        DCD              Dummy_Handler ;33:TPM0
+  918 00000088 00000000        DCD              Dummy_Handler ;34:TPM1
+  919 0000008C 00000000        DCD              Dummy_Handler ;35:(reserved)
+  920 00000090 00000000        DCD              Dummy_Handler ;36:RTC (alarm)
+  921 00000094 00000000        DCD              Dummy_Handler ;37:RTC (seconds)
+                                                            
+  922 00000098 00000000        DCD              Dummy_Handler ;38:PIT
+  923 0000009C 00000000        DCD              Dummy_Handler ;39:(reserved)
+  924 000000A0 00000000        DCD              Dummy_Handler ;40:(reserved)
+  925 000000A4 00000000        DCD              Dummy_Handler ;41:DAC0
+  926 000000A8 00000000        DCD              Dummy_Handler ;42:TSI0
+  927 000000AC 00000000        DCD              Dummy_Handler ;43:MCG
+  928 000000B0 00000000        DCD              Dummy_Handler ;44:LPTMR0
+  929 000000B4 00000000        DCD              Dummy_Handler ;45:(reserved)
+  930 000000B8 00000000        DCD              Dummy_Handler ;46:PORTA
+  931 000000BC 00000000        DCD              Dummy_Handler ;47:PORTB
+  932 000000C0         __Vectors_End
+  933 000000C0 000000C0 
+                       __Vectors_Size
+                               EQU              __Vectors_End - __Vectors
+  934 000000C0                 ALIGN
+  935 000000C0         ;*******************************************************
+                       *********
+  936 000000C0         ;Constants
+  937 000000C0                 AREA             MyConst,DATA,READONLY
+  938 00000000         ;>>>>> begin constants here <<<<<
+  939 00000000 54 79 70 
+              65 20 61 
+              20 71 75 
+              65 75 65 
+              20 63 6F 
+              6D 6D 61 
+              6E 64 20 
+              28 44 2C 
+              45 2C 48 
+              2C 50 2C 
+              53 29 3A 
+              00       prompt  DCB              "Type a queue command (D,E,H,P,
+S):\0"
+
+
+
+ARM Macro Assembler    Page 22 Program Title for Listing Header Goes Here
+
+
+  940 00000022 43 68 61 
+              72 61 63 
+              74 65 72 
+              20 74 6F 
+              20 65 6E 
+              71 75 65 
+              75 65 3A 
+              00       prompt_en
+                               DCB              "Character to enqueue:\0"
+  941 00000038 3A 09 49 
+              6E 3D 30 
+              78 25 68 
+              20 20 4F 
+              75 74 3D 
+              30 78 25 
+              68 20 20 
+              4E 75 6D 
+              3D 25 62 
+              0D 0A 00 status  DCB              ":\tIn=0x%h  Out=0x%h  Num=%b\r
+\n\0"
+  942 00000056 53 74 61 
+              74 75 73 
+              00       status_s
+                               DCB              "Status\0"
+  943 0000005D 53 75 63 
+              63 65 73 
+              73 00    success DCB              "Success\0"
+  944 00000065 46 61 69 
+              6C 75 72 
+              65 00    failure DCB              "Failure\0"
+  945 0000006D 0D 0A 00 
+                       newline DCB              "\r\n\0"
+  946 00000070 0D 0A 0D 
+              0A 49 6E 
+              76 61 6C 
+              69 64 20 
+              66 6F 72 
+              6D 61 74 
+              20 73 74 
+              72 69 6E 
+              67 20 27 
+              25 73 27 
+              0D 0A 00 invalid DCB              "\r\n\r\nInvalid format string 
+'%s'\r\n\0"
+  947 00000091 49 6E 76 
+              61 6C 69 
+              64 20 63 
+              6F 6D 6D 
+              61 6E 64 
+              20 27 25 
+              63 27 0D 
+              0A 00    invalid_in
+                               DCB              "Invalid command '%c'\r\n\0"
+  948 000000A8 44 20 28 
+              64 65 71 
+              75 65 75 
+              65 29 2C 
+              20 45 20 
+              28 65 6E 
+
+
+
+ARM Macro Assembler    Page 23 Program Title for Listing Header Goes Here
+
+
+              71 75 65 
+              75 65 29 
+              2C 20 48 
+              20 28 68 
+              65 6C 70 
+              29 2C 20 
+              50 20 28 
+              70 72 69 
+              6E 74 29 
+              2C 20 53 
+              20 28 73 
+              74 61 74 
+              75 73 29 
+              0D 0A 00 help    DCB              "D (dequeue), E (enqueue), H (h
+elp), P (print), S (status)\r\n\0"
+  949 000000E4 54 65 73 
+              74 20 73 
+              74 72 69 
+              6E 67 20 
+              25 6A 64 
+              73 6F 6B 
+              61 00    test_invalid_printf
+                               DCB              "Test string %jdsoka\0" ; Just 
+                                                            used to test the pr
+                                                            intf() function
+  950 000000F8         ;>>>>>   end constants here <<<<<
+  951 000000F8                 ALIGN
+  952 000000F8         ;*******************************************************
+                       *********
+  953 000000F8         ;Variables
+  954 000000F8                 AREA             MyData,DATA,READWRITE
+  955 00000000         ;>>>>> begin variables here <<<<<
+  956 00000000 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 queue   SPACE            Q_REC_SZ
+  957 00000012 00 00           ALIGN
+  958 00000014 00 00 00 
+              00       buffer  SPACE            Q_BUF_SZ
+  959 00000018                 ALIGN
+  960 00000018 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00    printf_static
+                               SPACE            20          ; Internal memory u
+                                                            sed by printf
+  961 0000002C         ;>>>>>   end variables here <<<<<
+  962 0000002C                 ALIGN
+  963 0000002C                 END
+Command Line: --debug --diag_suppress=9931 --cpu=Cortex-M0+ --apcs=interwork --
+depend=.\objects\exercise07.d -o.\objects\exercise07.o -I"C:\Users\Andrei Tumba
+r\AppData\Local\Arm\Packs\Keil\Kinetis_KLxx_DFP\1.14.0\Device\Include" -IC:\Kei
+l_v5\ARM\CMSIS\Include --predefine="__EVAL SETA 1" --predefine="__UVISION_VERSI
+ON SETA 531" --predefine="MKL05Z32xxx4 SETA 1" --list=.\listings\exercise07.lst
+
+
+
+ARM Macro Assembler    Page 24 Program Title for Listing Header Goes Here
+
+
+ Exercise07.s

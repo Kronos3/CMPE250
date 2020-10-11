@@ -22,7 +22,7 @@
 ;EQUates
 ; UART0 Equates
 ;UART0 register addresses as well as bit field offsets and masks
-;from 'MKL05Z4.s� included by program template
+;from 'MKL05Z4.s' included by program template
 ;---------------------------------------------------------------
 ;UART0_BDH
 ; 0-> 7:LIN break detect IE (disabled)
@@ -31,7 +31,7 @@
 ;00001->4-0:SBR[12:0] (UART0CLK / [9600 * (OSR + 1)])
 ;UART0CLK is MCGFLLCLK
 ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
-;SBR � 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+;SBR = 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
 ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
 UART0_BDH_9600 EQU 0x01
 ;---------------------------------------------------------------
@@ -39,7 +39,7 @@ UART0_BDH_9600 EQU 0x01
 ;26->7-0:SBR[7:0] (UART0CLK / [9600 * (OSR + 1)])
 ;UART0CLK is MCGFLLCLK
 ;MCGPLLCLK is 47972352 Hz ~=~ 48 MHz
-;SBR � 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+;SBR = 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
 ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
 UART0_BDL_9600 EQU 0x38
 
@@ -142,6 +142,24 @@ Q_BUF_SZ    EQU   4   ;Queue contents
 Q_REC_SZ    EQU   18  ;Queue management record
 
 
+            MACRO
+$label      PUSH_STATUS $RBUF, $R
+            LDRB $RBUF,[$R,#NUM_ENQD]
+            PUSH {$RBUF}
+            LDR  $RBUF,[$R,#OUT_PTR]
+            PUSH {$RBUF}
+            LDR  $RBUF,[$R,#IN_PTR]
+            PUSH {$RBUF}
+            MEND
+            
+            MACRO
+$label      P  $string
+            PUSH {R1}
+            LDR R1,=$string
+            BL  printf
+            POP {R1}
+            MEND
+
 ;****************************************************************
 ;Program
 ;Linker requires Reset_Handler
@@ -166,54 +184,170 @@ main
             MOVS R2,#Q_BUF_SZ
             BL   InitQueue
             
-main_loop   ; Print the prompt string
-            LDR  R0,=prompt
-            LDR  R1,=enqueue ; Size of prompt string
-            SUBS R1,R1,R0   ; Get the size of R0
-            BL   PutStringSB
+__9        P    newline
             
+main_loop   
+__0         P prompt; Print the prompt string
+            ; Get input
+            BL   GetChar
+            BL   PutChar
             
+            ; Print a newline and handle the inputed command
+            P newline
+            BL   HandleCommand
             
-main_fail   printf =failure
-            B main_loop
-
-main_success printf =success
-            B main_loop
-
-            MACRO
-$label      printf $fmt_string
-            PUSH {R0-R4}
-            LDRB R0,[R1,#NUM_ENQD]
-            PUSH {R0}
-            LDR  R0,[R1,#OUT_PTR]
-            PUSH {R0}
-            LDR  R0,[R1,#IN_PTR]
-            PUSH {R0}
-            LDR  R1,$fmt_string
-            BL   printf
-            POP  {R0-R4}
+            B    main_loop
 
 ;>>>>>   end main program code <<<<<
 ;Stay here
             B       .
             ENDP
 ;>>>>> begin subroutine code <<<<<
+
+; Handle a command input
+; Subroutines used:
+;   Dequene
+;   Enqueue
+;   printf
+;   PutChar
+; Input:
+;   R0: input command (case insensitive)
+;   R1: Pointer to queue structure
+; Output (None)
+; Modified Registers (None)
+HandleCommand PROC {R0-R12}
+            PUSH {R0-R4,LR}
+AS_L_S      EQU 'a'
+AS_L_E      EQU 'z'
+AS_U_S      EQU 'A'
+AS_U_E      EQU 'Z'
+    
+            ; Convert the character to upper-case
+            CMP R0,#AS_U_S
+            BLT invalid_char
+            CMP R0,#AS_U_E
+            BLE do_cmd ; Already in uppercase
+            ; Convert to upper case
+            SUBS R0,R0,#(AS_L_S - AS_U_S)
+            B   do_cmd
+
+do_cmd      CMP R0,#'D'
+            BEQ do_deq
+            CMP R0,#'E'
+            BEQ do_enq
+            CMP R0,#'H'
+            BEQ do_help
+            CMP R0,#'P'
+            BEQ do_print
+            CMP R0,#'S'
+            BEQ do_status
+            B   invalid_char
+
+do_deq      BL  Dequeue
+            BCS handle_fail
+            BL  PutChar
+            B   print_status
+
+do_enq      ; Print the enqueue prompt
+__1         P prompt_en
+            
+            ; Get the character and enqueue it
+            BL  GetChar
+            BL  PutChar
+__8         P   newline
+            
+            BL  Enqueue
+            BCS handle_fail
+            B   handle_info
+
+do_print    ; Print the contents of the queue
+            MOVS R0,#'>'
+            BL   PutChar
+            LDR  R2,[R1,#OUT_PTR]
+            LDRB R3,[R1,#NUM_ENQD]
+            LDR  R4,[R1,#BUF_PAST]
+do_print_l  TST R3,R3 ; While we have not printed all of the characters
+            BEQ  do_print_b ; break
+            LDRB R0,[R2,#0] ; Print this character
+            BL   PutChar
+            ADDS R2,R2,#1 ; Increment the pointer
+            SUBS R3,R3,#1 ; Decrement the down counter
+            CMP  R2,R4    ; Check if we need to circle back
+            BLT  do_print_l
+            LDR  R2,[R1,#BUF_STRT] ; Circle back to the start of the buffer
+            B    do_print_l
+do_print_b  MOVS R0,#'<'
+            BL   PutChar
+            P    newline
+            B    end_handle
+
+do_status   
+__7         P    status_s
+            B    print_status
+
+do_help     LDR  R1,=help
+            BL   printf
+            B    end_handle
+
+invalid_char 
+            PUSH {R1}
+            PUSH {R0}
+            LDR  R1,=invalid_in
+__6         BL   printf
+            POP  {R1}
+            B    end_handle
+
+handle_info 
+__4         P success
+            B    print_status
+handle_fail 
+__3         P    failure
+            B    print_status
+print_status
+__2         PUSH_STATUS R0,R1
+            LDR  R1,=status
+__5         BL   printf
+end_handle  POP  {R0-R4,PC}
+            ENDP
+
 ; This subroutine is a printf() clone with the following
 ; formats defined:
 ;    %h: hex
 ;    %d: decimal
 ;    %s: string
 ;    %b: single byte decimal
+;    %c: char
+; Subroutines used:
+;    PutChar
+;    PutNumHex (%h)
+;    PutNumU   (%d)
+;    PutStringSB (%s)
+;    PutNumUB (%b)
+;    printf (recursive call on error)
 ; Input Registers:
 ;    R1: Pointer to the format string
-;    N variables on the stack
-; This sub-routine will modify multiple registers and
-; will NOT restore their values because we can not modify the stack.
-; NOTE: The variables must be push BACKWARDS to the stack
+;    N variables on the stack that correspond 
+;    to arguments in the format string
+; Output (None)
+; Modified Registers (None)
 printf      PROC {R0-R12}
+            ; Because the stack is used to pass parameters to
+            ; this subroutines. We can't modify the stack pointer
+            ; before moving through the format string.
+            ; Use the memory as a stack
+            PUSH {R5}
+            LDR  R5,=printf_static
+            STR  R0,[R5,#0]
+            STR  R1,[R5,#4]
+            STR  R2,[R5,#8]
+            STR  R3,[R5,#12]
+            STR  R4,[R5,#16]
+            POP  {R5}
+            
+            ; Store the return pointer
             PUSH {LR}
             POP  {R4}
-            MOVS R3,R1 ; Save the original string if we run into an error
+            
 printf_loop LDRB R2,[R1,#0]
             TST  R2,R2
             BEQ  printf_end ;  End of string
@@ -230,11 +364,17 @@ printf_fmt  ADDS R1,R1,#1
             BEQ  printf_d
             CMP  R2,#'s' ; Print a string
             BEQ  printf_s
+            CMP  R2,#'c'
+            BEQ  printf_c
             CMP  R2,#'b' ; Print a single byte
             BEQ  printf_b
             ; INVALID FORMAT STRING
             ; Print the error string
-            PUSH {R6}
+            PUSH {R5}
+            LDR  R1,[R5,#4]
+            POP  {R5}
+            
+            PUSH {R1}
             LDR  R1,=invalid
             BL   printf
             B    . ; Invalid format string (STOP)
@@ -257,20 +397,36 @@ printf_b    ; Print the single byte value in R0
             POP  {R0}
             BL   PutNumUB
             B    printf_continue
+printf_c    ; Print the single char value in R0
+            POP  {R0}
+            BL   PutChar
+            B    printf_continue
 printf_continue ADDS R1,R1,#1
             B  printf_loop
-printf_end  ; Restore PUSH'ed variables
-            PUSH {R4}
-            POP  {PC}
+printf_end  ; Restore the link register
+            PUSH {R4} ; This will be POP'ed to PC
+            
+            ; Restore registers from memory
+            PUSH {R5}
+            LDR  R5,=printf_static
+            LDR  R0,[R5,#0]
+            LDR  R1,[R5,#4]
+            LDR  R2,[R5,#8]
+            LDR  R3,[R5,#12]
+            LDR  R4,[R5,#16]
+            POP  {R5}
+            
+            POP {PC}
             ENDP
 
-; Initialize a queue structure with the
-; following parameters
-; R0: Pointer to the first address of the circular buffer
-; R1: Pointer to the start of the queue structure
-; R2: Size of the circular buffer pointed to by R0
-; No output is generated/no registers are changed
-; Uses R0-R2
+; Initialize a queue structure
+; Subroutines Used: (none)
+; Input:
+;   R0: Pointer to the first address of the circular buffer
+;   R1: Pointer to the start of the queue structure
+;   R2: Size of the circular buffer pointed to by R0
+; Output (None)
+; Modified Registers (None)
 InitQueue   PROC {R0-R12}
             PUSH {R0-R2}
             STR   R0,[R1,#IN_PTR]
@@ -285,9 +441,11 @@ InitQueue   PROC {R0-R12}
             BX   LR
             ENDP
 
-;If the queue (whose queue record structure�s address is in R1) is not full, enqueues the 
-;character from R0 to the queue and reports success by returning with the C flag 
-;cleared, (i.e., 0); otherwise only reports failure by returning with the C flag set, (i.e., 1). 
+; Emplace a character into the queue structure.
+; If the queue is already full, indicate failure
+; by setting the C flag in the APSR. A cleared C flag
+; indicates success.
+; Subroutes used: (none)
 ; Input:  R0:  Character to enqueue
 ;         R1:  Address of queue record structure
 ; Output:  PSR C flag:  Success(0) or Failure (1)
@@ -299,22 +457,21 @@ Enqueue     PROC {R0-R12}
             LDRB R3,[R1,#BUF_SIZE]
             CMP  R2,R3  ; Check if the queue is full
             BGE  en_full
-            STRB R0,[R1,#IN_PTR]; Put new element at memory location pointed by InPointer
+            LDR  R3,[R1,#IN_PTR]
+            STRB R0,[R3,#0]; Put new element at memory location pointed by InPointer
             ; Increment NumberEnqueued
-            LDRB R2,[R1,#NUM_ENQD] 
             ADDS R2,R2,#1
             STRB R2,[R1,#NUM_ENQD]
 
             ; Increment InPointer
-            LDR  R2,[R1,#IN_PTR]
-            ADDS R2,R2,#1
-            LDR  R3,[R1,#BUF_PAST]
-            CMP  R2,R3
-            BLT  en_str  ; If (R1->in_ptr < R1->BUF_PAST) goto de_str
+            ADDS R3,R3,#1
+            LDR  R2,[R1,#BUF_PAST]
+            CMP  R3,R2
+            BLT  en_str  ; If (R1->in_ptr < R1->BUF_PAST) goto en_str
             ; IN_PTR is past the end of the queue
             ; We need to set it back to the start of the queue
-            LDR  R2,[R1,#BUF_STRT]
-en_str      STR  R2,[R1,#IN_PTR]
+            LDR  R3,[R1,#BUF_STRT]
+en_str      STR  R3,[R1,#IN_PTR]
             ; Clear the carry flag  (No error occured)
             MRS  R2,APSR
             MOVS R3,#0x20
@@ -332,10 +489,11 @@ en_done     POP  {R2,R3}
             BX   LR
             ENDP
 
-;If the queue (whose queue record structure�s address is in R1) is not empty, dequeues  
-;a character from the queue to R0 and reports success by returning with the Cflag 
-;cleared, (i.e., 0)
-; otherwise only reports failure by returning with the Cflag set, (i.e., 1). 
+; Remove the next item from the queue structure.
+; If the queue is already empty, indicate failure by
+; setting the C flag in the APSR. A cleared C flag
+; indicates success.
+; Subroutines used: (none)
 ; Input:  R1:  Address of queue record structure 
 ; Output: R0:  Character dequeued 
 ;         PSR C flag:  Success(0) or Failure (1)
@@ -343,26 +501,25 @@ en_done     POP  {R2,R3}
 ; APSR 
 ; All other registers remain unchanged on return
 Dequeue     PROC {R1-R12}
-            PUSH {R2,R3}
-            LDRB R2,[R1,#NUM_ENQD]
+            PUSH {R2-R4}
+            LDRB R2,[R1,#NUM_ENQD] ; R2 = NUM_ENQ
+            LDR  R3,[R1,#OUT_PTR] ; R3 = OUT_PTR
             CMP  R2,#0
             BLE  de_empty  ; No more items in the queue
-            LDRB R0,[R1,#OUT_PTR] ; Get item at OUT_PTR
+            LDRB R0,[R3,#0] ; Get item at OUT_PTR
             ; Decrement number enqueued
-            LDRB R2,[R1,#NUM_ENQD]
             SUBS R2,R2,#1
             STRB R2,[R1,#NUM_ENQD]
 
             ; Increment OutPointer
-            LDRB R2,[R1,#OUT_PTR]
-            ADDS R2,R2,#1
-            LDR  R3,[R1,#BUF_PAST]
-            CMP  R2,R3
+            ADDS R3,R3,#1
+            LDR  R4,[R1,#BUF_PAST]
+            CMP  R3,R4
             BLT  de_str  ; If (R1->out_ptr < R1->BUF_PAST) goto de_str
             ; OUT_PTR is past the end of the queue
             ; We need to set it back to the start of the queue
-            LDR  R2,[R1,#BUF_STRT]
-de_str      STR  R2,[R1,#OUT_PTR]
+            LDR  R3,[R1,#BUF_STRT]
+de_str      STR  R3,[R1,#OUT_PTR]
             ; Clear the carry flag (No error occured)
             MRS  R2,APSR
             MOVS R3,#0x20
@@ -376,12 +533,14 @@ de_empty    ; Set the carry flag (Error occured)
             LSLS R3,R3,#24
             ORRS R2,R2,R3
             MSR  APSR,R2
-de_done     POP  {R2,R3}
+de_done     POP  {R2-R4}
             BX   LR
             ENDP
 
 
-; Print a number in hex
+; Print a 32-bit number in hex
+; Subroutines used:
+;   PutDigHex
 ; Input parameter:
 ;   R0: number to print in hexadecimal (unsigned word value)
 ; Output parameter: (none)
@@ -393,7 +552,6 @@ RIGHT_NIBBLE_MASK EQU 0x0F
             MOVS R3,#24
             MOVS R4,#RIGHT_NIBBLE_MASK
             RORS R0,R0,R3 ; Move the MSB to the LSB
-            MOVS R3,#8
 pnh_loop    CMP  R1,#4
             BGE  pnh_done
             ; Print the most significant nibble
@@ -412,26 +570,31 @@ pnh_done    POP  {R0-R4,PC}
 
 ; Print a single hex digit
 ; stored in R2
-; Input parameter
+; Subroutines used:
+;   PutChar
+; Input parameter:
+;   R2 Hex digit to print
 PutDigHex   PROC {R0-R12}
 ASCII_LETTER EQU 10 ; Any values greater than or equal to this will be a letter A-F
 ASCII_DIG_OFF EQU '0'
-ASCII_LET_OFF EQU 'A'
-            PUSH {R0,R2,LR}
-            CMP  R2,#ASCII_LETTER
-            BGE  put_hex_letter
-            ADDS R2,R2,#ASCII_DIG_OFF
-            MOVS R0,R2
-            B    put_dig
-put_hex_letter
+ASCII_DIG_LAST EQU '9'
+ASCII_LET_OFF EQU ('A' - '0' - 10)
+            PUSH {R0,R2,R3,LR}
+            MOVS R3,#0xFF
+            ANDS R2,R2,R3
+            ADDS R2,#ASCII_DIG_OFF
+            CMP  R2,#ASCII_DIG_LAST
+            BLT  put_dig
             ADDS R2,R2,#ASCII_LET_OFF
-            MOVS R0,R2
-put_dig     BL   PutChar
-            POP  {R0,R2,PC}
+put_dig     MOVS R0,R2
+            BL   PutChar
+            POP  {R0,R2,R3,PC}
             ENDP
 
 ; Prints to the terminal screen the decimal representation of the
 ; unsigned byte value in R0
+; Subroutines Used:
+;  PutNumU
 ; Input parameter:
 ;   R0:number to print in decimal (unsigned byte value)
 ;Output parameter: (none)
@@ -554,6 +717,7 @@ DIVU_STOP   POP  {R2-R7}
 
 
 ; PutChar will print a character to the terminal
+; Subroutines used: (none)
 ; Input: R0 (character to print)
 ; Output; None
 ; Register modification list: R1-R3
@@ -576,6 +740,7 @@ putchar_l   LDRB R3,[R1,#UART0_S1_OFFSET]
             ENDP
 
 ; GetChar will real a character from the terminal
+; Subroutines used: (none)
 ; Input: None
 ; Output; R0 (character read from terminal)
 ; Register modification list: R1-R3
@@ -630,6 +795,7 @@ putdone             POP {R0-R4,PC}
 
 ; Initialize the UART0 serial polling with
 ; 8 databits, no parity, one stop bit
+; Subroutines used: (none)
 ; Input: None
 ; Output: None
 ; Register modification: R0-R2
@@ -692,7 +858,7 @@ PORT_PCR_SET_PTB1_UART0_TX  EQU  (PORT_PCR_ISF_MASK :OR: PORT_PCR_MUX_SELECT_2_M
             BICS  R2,R2,R1
             STRB  R2,[R0,#UART0_C2_OFFSET]
             
-            ; Set UART0 baud rate�BDH before BDL
+            ; Set UART0 baud rate?BDH before BDL
             MOVS R1,#UART0_BDH_9600
             STRB R1,[R0,#UART0_BDH_OFFSET]
             MOVS R1,#UART0_BDL_9600
@@ -798,10 +964,15 @@ __Vectors_Size  EQU     __Vectors_End - __Vectors
             AREA    MyConst,DATA,READONLY
 ;>>>>> begin constants here <<<<<
 prompt      DCB     "Type a queue command (D,E,H,P,S):\0"
-enqueue     DCB     "Charater to enqueue:\0"
-success     DCB     "Success:   In=0x%h  Out=0x%h  Num=%b\r\n\0"
-failure     DCB     "\r\nFailure:   In=0x%h  Out=0x%h  Num=%b\r\n\0"
+prompt_en   DCB     "Character to enqueue:\0"
+status      DCB     ":\tIn=0x%h  Out=0x%h  Num=%b\r\n\0"
+status_s    DCB     "Status\0"
+success     DCB     "Success\0"
+failure     DCB     "Failure\0"
+newline     DCB     "\r\n\0"
 invalid     DCB     "\r\n\r\nInvalid format string '%s'\r\n\0"
+invalid_in  DCB     "Invalid command '%c'\r\n\0"
+help        DCB     "D (dequeue), E (enqueue), H (help), P (print), S (status)\r\n\0"
 test_invalid_printf  DCB  "Test string %jdsoka\0"  ; Just used to test the printf() function
 ;>>>>>   end constants here <<<<<
             ALIGN
@@ -810,7 +981,10 @@ test_invalid_printf  DCB  "Test string %jdsoka\0"  ; Just used to test the print
             AREA    MyData,DATA,READWRITE
 ;>>>>> begin variables here <<<<<
 queue       SPACE   Q_REC_SZ
+            ALIGN
 buffer      SPACE   Q_BUF_SZ
+            ALIGN
+printf_static SPACE 20 ; Internal memory used by printf
 ;>>>>>   end variables here <<<<<
             ALIGN
             END

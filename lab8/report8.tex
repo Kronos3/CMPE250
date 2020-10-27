@@ -10,10 +10,10 @@
 \newcommand{\CourseName}{Assembly and Embedded Programming}
 \newcommand{\SemesterName}{Fall 2020}
 \newcommand{\SemesterCode}{20201}
-\newcommand{\LabExNum}{7}
-\newcommand{\LabExTitle}{Circular FIFO Queue Operations}
+\newcommand{\LabExNum}{8}
+\newcommand{\LabExTitle}{Multiprecision Arithmetic}
 \newcommand{\StudentName}{Andrei Tumbar}
-\newcommand{\DateSubmit}{Submitted: 10-13-20}
+\newcommand{\DateSubmit}{Submitted: 10-27-20}
 \newcommand{\LabSection}{5}
 \newcommand{\LabInstructor}{Gordon Werner}
 \newcommand{\TAa}{Tianran Cui}
@@ -197,40 +197,10 @@
 \thispagestyle{plain}
 %***********************************************************************
 %Report body begins here
-\section*{Abstract}
-In this laboratory exercise, the functionality of queue structures was investigated. These queues were defined with a record structure and a queue buffer. The buffer was circular meaning when the end of the buffer area was filled, the next item would be enqueued into the start of the buffer. The buffer size of the queue was of arbitrary size defined at four bytes. Subroutines were created to perform operations on the queue structure as well as to print the status of the structure. The exercise was successful as the results indicated that the queue structure worked as intended. 
 
+\section*{Demonstration}
 
-\section*{Procedure}
-A command prompt was written that accepted commands: \code{D}, \code{E}, \code{P}, and \code{S} respresented dequeue, enqueue, print, and status respectively. The status command printed current value of \code{InPointer}, \code{OutPointer} and \code{NumEnqueued}. \code{InPointer} is the next location in the queue buffer that an item is enqueued. \code{OutPointer} points to the next character that will be dequeued. \code{NumEnqueued} keeps track of how many items have been stored.
-
-Because \code{InPointer} and \code{OutPointer} are pointers, convention is to print them in hexidecimal. To facilitate this, a \code{PutNumHex} subroutine was written to print hexidecimal numbers.
-
-\code{NumEnqueued} is defined in the queue record structure as an 8-bit unsigned integer. To print this number, a \code{PutNumUB} subroutine was written to wrap functionality of \code{PutNumU} to only print a single byte.
-
-The queue operations, \code{Enqueue} and \code{Dequeue} were implemented to work for an arbitrarily sized queue buffer. A set \code{APSR} C-flag was used in both subroutines no signify failure. Failure in \code{Enqueue} meant that the buffer was full where-as failure in \code{Dequeue} meant the queue was empty.
-
-The prompt and status operations required parameterized string to be printed. Because of this, a \code{printf}-like subroutine was written to expand a format string and a number of associated arguments. The subroutines uses \code{printf}-like format string and takes contents of the stack to pass arguments. For example, a format string with stack contents:
-
-\begin{lstlisting}[style=CStyle]
-format: Hello %s, %d, 0x%x, %b, %c\r\n\0
-stack order of PUSH #'c',#25,0x1fffe100,1600,"World\0" 
-
-Output: Hello World, 1600, 0x1ffe100, 25, c
-\end{lstlisting}
-
-One thing to note is that the contents of the stack are read backwards meaning that they must be \code{PUSH}'ed in reverse order. The format strings shown above illustrates every implemented format specifier. All format specifiers shown are equivalent to \code{printf} from \code{glibc}. Because the stack was used to pass arguments, this subroutine could not make changes to the stack and therefore had to store register values in a defined block of RAM.
-
-\code{printf} was useful for debug and completing this exercise. This subroutine can easily be expanded to print different formats.
-
-\section*{Results}
-The total size of the executable code as seen in the map file was $1080$ bytes. The large size has mostly to do with the extra \code{printf} subroutine.
-
-Constants in the Read-Only Memory (ROM) make up $248$. This area consists of all format string and prompt strings used in this lab.
-
-Finally Random-Access Memory (RAM) consists of $18$ bytes for the queue structure, $2$ bytes of padding, $4$ bytes for the circular buffer, and finally $20$ bytes used internally by the \code{printf} function. This makes up $44$ bytes total used in RAM.
-
-After the program was written and compiled, the executable was loaded into a KL-05 board to be tested.
+A screen capture of the terminal output of the final program was taken. The screen capture was taken after the final demonstration was performed.
 
 \begin{figure}[h!]
 	\centering
@@ -239,10 +209,29 @@ After the program was written and compiled, the executable was loaded into a KL-
 	\label{fig:capture1}
 \end{figure}
 
-Figure \ref{fig:capture1} shows the output of the terminal after each prompt command was used in various steps. The queue contents are printed after command that modifies the queue. Figure \ref{fig:capture1} shows an enqueue of \code{g} and \code{b} followed by three dequeues. The third dequeue will print an error because the queue was empty.
+The first operation tests that basic adding functionality works with 16-byte integers. This test is an important baseline to verify that the numbers were stored in little endian format. The next addition tests both the case-insensitive support along with the carry bit from the first word to the second. The next two cases also test that the carry bit is functional between each of the word boundaries.
 
-\section*{Conclusion}
-This laboratory exercise was useful in exploring circular queue structures. It was also useful because it practiced the use of data structures and use of \code{MACRO} in assembly. The exercise was successful in teaching queue structures as a working one was implemented. This will be useful later when doing buffered I/O to improve performance. In addition to the requirements of this lab, the implementation of the \code{printf} subroutine will prove useful in later labs as the subroutine has many practical uses.
+The next two inputs will nexts that is a carry on the final bit is set, the program will indicate that the addition operation overflowed.
+
+Finally the last two addition operations test whether invalid input will properly re-prompt the user for both the addend and augend.
+
+\section*{Subroutine addresses}
+
+\begin{table}[h!]
+\begin{center}
+\caption{Code section offsets and endings.}
+\label{tab:q1}
+\begin{tabular}{ |l||c|c| }
+\hline
+Subroutine & Address & Size (bytes) \\\hhline{|=||=|=|}
+main & \code{0x00000410} & \code{140} \\\hline 
+AddIntMultiU & \code{0x0000049d} & \code{56} \\\hline 
+GetHexIntMulti & \code{0x000004d5} & \code{116} \\\hline
+PutHexIntMulti & \code{0x00000549} & \code{26} \\\hline
+\end{tabular}
+\end{center}
+\end{table}
+
 
 \label{LastPage}
 \end{document}

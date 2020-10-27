@@ -312,14 +312,14 @@ end_handle  POP  {R0-R4,PC}
 
 ; This subroutine is a printf() clone with the following
 ; formats defined:
-;    %h: hex
+;    %x: hex
 ;    %d: decimal
 ;    %s: string
 ;    %b: single byte decimal
 ;    %c: char
 ; Subroutines used:
 ;    PutChar
-;    PutNumHex (%h)
+;    PutNumHex (%x)
 ;    PutNumU   (%d)
 ;    PutStringSB (%s)
 ;    PutNumUB (%b)
@@ -358,7 +358,7 @@ printf_loop LDRB R2,[R1,#0]
             B    printf_continue
 printf_fmt  ADDS R1,R1,#1
             LDRB R2,[R1,#0]
-            CMP  R2,#'h' ; Print a hex string
+            CMP  R2,#'x' ; Print a hex string
             BEQ  printf_h
             CMP  R2,#'d' ; Print a decimal string
             BEQ  printf_d
@@ -378,7 +378,7 @@ printf_fmt  ADDS R1,R1,#1
             LDR  R1,=invalid
             BL   printf
             B    . ; Invalid format string (STOP)
-printf_h    ; Print the current number in R0
+printf_x    ; Print the current number in R0
             POP  {R0}
             BL   PutNumHex
             B    printf_continue
@@ -965,7 +965,7 @@ __Vectors_Size  EQU     __Vectors_End - __Vectors
 ;>>>>> begin constants here <<<<<
 prompt      DCB     "Type a queue command (D,E,H,P,S):\0"
 prompt_en   DCB     "Character to enqueue:\0"
-status      DCB     ":\tIn=0x%h  Out=0x%h  Num=%b\r\n\0"
+status      DCB     ":\tIn=0x%x  Out=0x%x  Num=%b\r\n\0"
 status_s    DCB     "Status\0"
 success     DCB     "Success\0"
 failure     DCB     "Failure\0"

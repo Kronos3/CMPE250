@@ -1,0 +1,1828 @@
+
+
+
+ARM Macro Assembler    Page 1 Timer driver
+
+
+    1 00000000                 TTL              Timer driver
+    2 00000000         ;*******************************************************
+                       *********
+    3 00000000         ;Descriptive comment header goes here.
+    4 00000000         ;Timer driver
+    5 00000000         ;Name:  Andrei Tumbar
+    6 00000000         ;Date:  10/07/20
+    7 00000000         ;Class:  CMPE-250
+    8 00000000         ;Section:  5, Tuesday, 11 AM
+    9 00000000         ;-------------------------------------------------------
+                       --------
+   10 00000000         ;Keil Template for KL05
+   11 00000000         ;R. W. Melton
+   12 00000000         ;September 13, 2020
+   13 00000000         ;*******************************************************
+                       *********
+   14 00000000         ;Assembler directives
+   15 00000000                 THUMB
+   17 00000000         ;*******************************************************
+                       *********
+   18 00000000         ;Include files
+   19 00000000                 GET              MKL05Z4.s   ;Included by start.
+                                                            s
+   21 00000000         ;*******************************************************
+                       *********
+   22 00000000         ;-------------------------------------------------------
+                       --------
+   23 00000000         ;NVIC_ICER
+   24 00000000         ;31-00:CLRENA=masks for HW IRQ sources;
+   25 00000000         ;             read:   0 = unmasked;   1 = masked
+   26 00000000         ;             write:  0 = no effect;  1 = mask
+   27 00000000         ;22:PIT IRQ mask
+   28 00000000         ;12:UART0 IRQ mask
+   29 00000000 00400000 
+                       NVIC_ICER_PIT_MASK
+                               EQU              PIT_IRQ_MASK
+   30 00000000 00001000 
+                       NVIC_ICER_UART0_MASK
+                               EQU              UART0_IRQ_MASK
+   31 00000000         ;-------------------------------------------------------
+                       --------
+   32 00000000         ;NVIC_ICPR
+   33 00000000         ;31-00:CLRPEND=pending status for HW IRQ sources;
+   34 00000000         ;             read:   0 = not pending;  1 = pending
+   35 00000000         ;             write:  0 = no effect;
+   36 00000000         ;                     1 = change status to not pending
+   37 00000000         ;22:PIT IRQ pending status
+   38 00000000         ;12:UART0 IRQ pending status
+   39 00000000 00400000 
+                       NVIC_ICPR_PIT_MASK
+                               EQU              PIT_IRQ_MASK
+   40 00000000 00001000 
+                       NVIC_ICPR_UART0_MASK
+                               EQU              UART0_IRQ_MASK
+   41 00000000         ;-------------------------------------------------------
+                       --------
+   42 00000000         ;NVIC_IPR0-NVIC_IPR7
+   43 00000000         ;2-bit priority:  00 = highest; 11 = lowest
+   44 00000000         ;--PIT--------------------
+
+
+
+ARM Macro Assembler    Page 2 Timer driver
+
+
+   45 00000000 00000000 
+                       PIT_IRQ_PRIORITY
+                               EQU              0
+   46 00000000 00C00000 
+                       NVIC_IPR_PIT_MASK
+                               EQU              (3 << PIT_PRI_POS)
+   47 00000000 00000000 
+                       NVIC_IPR_PIT_PRI_0
+                               EQU              (PIT_IRQ_PRIORITY << PIT_PRI_PO
+S)
+   48 00000000         ;-------------------------------------------------------
+                       --------
+   49 00000000         ;NVIC_ISER
+   50 00000000         ;31-00:SETENA=masks for HW IRQ sources;
+   51 00000000         ;             read:   0 = masked;     1 = unmasked
+   52 00000000         ;             write:  0 = no effect;  1 = unmask
+   53 00000000         ;22:PIT IRQ mask
+   54 00000000         ;12:UART0 IRQ mask
+   55 00000000 00400000 
+                       NVIC_ISER_PIT_MASK
+                               EQU              PIT_IRQ_MASK
+   56 00000000 00001000 
+                       NVIC_ISER_UART0_MASK
+                               EQU              UART0_IRQ_MASK
+   57 00000000         ;-------------------------------------------------------
+                       --------
+   58 00000000         ;PIT_LDVALn:  PIT load value register n
+   59 00000000         ;31-00:TSV=timer start value (period in clock cycles - 1
+                       )
+   60 00000000         ;Clock ticks for 0.01 s at ~24 MHz count rate
+   61 00000000         ;0.01 s * ~24,000,000 Hz = ~240,000
+   62 00000000         ;TSV = ~240,000 - 1
+   63 00000000         ;Clock ticks for 0.01 s at 23,986,176 Hz count rate
+   64 00000000         ;0.01 s * 23,986,176 Hz = 239,862
+   65 00000000         ;TSV = 239,862 - 1
+   66 00000000 0003A8F5 
+                       PIT_LDVAL_10ms
+                               EQU              239861
+   67 00000000         ;-------------------------------------------------------
+                       --------
+   68 00000000         ;PIT_MCR:  PIT module control register
+   69 00000000         ;1-->    0:FRZ=freeze (continue'/stop in debug mode)
+   70 00000000         ;0-->    1:MDIS=module disable (PIT section)
+   71 00000000         ;               RTI timer not affected
+   72 00000000         ;               must be enabled before any other PIT set
+                       up
+   73 00000000 00000001 
+                       PIT_MCR_EN_FRZ
+                               EQU              PIT_MCR_FRZ_MASK
+   74 00000000         ;-------------------------------------------------------
+                       --------
+   75 00000000         ;PIT_TCTRL:  timer control register
+   76 00000000         ;0-->   2:CHN=chain mode (enable)
+   77 00000000         ;1-->   1:TIE=timer interrupt enable
+   78 00000000         ;1-->   0:TEN=timer enable
+   79 00000000 00000003 
+                       PIT_TCTRL_CH_IE
+                               EQU              (PIT_TCTRL_TEN_MASK :OR: PIT_TC
+TRL_TIE_MASK)
+
+
+
+ARM Macro Assembler    Page 3 Timer driver
+
+
+   80 00000000         ;-------------------------------------------------------
+                       --------
+   81 00000000         ;NVIC_IPR0-NVIC_IPR7
+   82 00000000         ;2-bit priority:  00 = highest; 11 = lowest
+   83 00000000 00000003 
+                       UART0_IRQ_PRIORITY
+                               EQU              3
+   84 00000000 000000C0 
+                       NVIC_IPR_UART0_MASK
+                               EQU              (3 << UART0_PRI_POS)
+   85 00000000 000000C0 
+                       NVIC_IPR_UART0_PRI_3
+                               EQU              (UART0_IRQ_PRIORITY << UART0_PR
+I_POS)
+   86 00000000         ;-------------------------------------------------------
+                       --------
+   87 00000000         ;-------------------------------------------------------
+                       --------
+   88 00000000         ;PORTx_PCRn (Port x pin control register n [for pin n])
+   89 00000000         ;___->10-08:Pin mux control (select 0 to 8)
+   90 00000000         ;Use provided PORT_PCR_MUX_SELECT_2_MASK
+   91 00000000         ;-------------------------------------------------------
+                       --------
+   92 00000000         ;SIM_SCGC4
+   93 00000000         ;1->10:UART0 clock gate control (enabled)
+   94 00000000         ;Use provided SIM_SCGC4_UART0_MASK
+   95 00000000         ;-------------------------------------------------------
+                       --------
+   96 00000000         ;UART0_BDH
+   97 00000000         ;    0->  7:LIN break detect IE (disabled)
+   98 00000000         ;    0->  6:RxD input active edge IE (disabled)
+   99 00000000         ;    0->  5:Stop bit number select (1)
+  100 00000000         ;00001->4-0:SBR[12:0] (UART0CLK / [9600 * (OSR + 1)]) 
+  101 00000000         ;UART0CLK is MCGFLLCLK
+  102 00000000         ;MCGFLLCLK is 47972352 Hz ~=~ 48 MHz
+  103 00000000         ;SBR ~=~ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+  104 00000000         ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
+  105 00000000 00000001 
+                       UART0_BDH_9600
+                               EQU              0x01
+  106 00000000         ;-------------------------------------------------------
+                       --------
+  107 00000000         ;UART0_BDL
+  108 00000000         ;26->7-0:SBR[7:0] (UART0CLK / [9600 * (OSR + 1)])
+  109 00000000         ;UART0CLK is MCGFLLCLK
+  110 00000000         ;MCGFLLCLK is 47972352 Hz ~=~ 48 MHz
+  111 00000000         ;SBR ~=~ 48 MHz / (9600 * 16) = 312.5 --> 312 = 0x138
+  112 00000000         ;SBR = 47972352 / (9600 * 16) = 312.32 --> 312 = 0x138
+  113 00000000 00000038 
+                       UART0_BDL_9600
+                               EQU              0x38
+  114 00000000         ;-------------------------------------------------------
+                       --------
+  115 00000000         ;UART0_C1
+  116 00000000         ;0-->7:LOOPS=loops select (normal)
+  117 00000000         ;0-->6:DOZEEN=doze enable (disabled)
+  118 00000000         ;0-->5:RSRC=receiver source select (internal--no effect 
+                       LOOPS=0)
+  119 00000000         ;0-->4:M=9- or 8-bit mode select 
+
+
+
+ARM Macro Assembler    Page 4 Timer driver
+
+
+  120 00000000         ;        (1 start, 8 data [lsb first], 1 stop)
+  121 00000000         ;0-->3:WAKE=receiver wakeup method select (idle)
+  122 00000000         ;0-->2:IDLE=idle line type select (idle begins after sta
+                       rt bit)
+  123 00000000         ;0-->1:PE=parity enable (disabled)
+  124 00000000         ;0-->0:PT=parity type (even parity--no effect PE=0)
+  125 00000000 00000000 
+                       UART0_C1_8N1
+                               EQU              0x00
+  126 00000000         ;-------------------------------------------------------
+                       --------
+  127 00000000         ;UART0_C2
+  128 00000000         ;0-->7:TIE=transmit IE for TDRE (disabled)
+  129 00000000         ;0-->6:TCIE=transmission complete IE for TC (disabled)
+  130 00000000         ;0-->5:RIE=receiver IE for RDRF (disabled)
+  131 00000000         ;0-->4:ILIE=idle line IE for IDLE (disabled)
+  132 00000000         ;1-->3:TE=transmitter enable (enabled)
+  133 00000000         ;1-->2:RE=receiver enable (enabled)
+  134 00000000         ;0-->1:RWU=receiver wakeup control (normal)
+  135 00000000         ;0-->0:SBK=send break (disabled, normal)
+  136 00000000 0000000C 
+                       UART0_C2_T_R
+                               EQU              (UART0_C2_TE_MASK :OR: UART0_C2
+_RE_MASK)
+  137 00000000 0000002C 
+                       UART0_C2_T_RI
+                               EQU              (UART0_C2_RIE_MASK :OR: UART0_C
+2_T_R)
+  138 00000000 000000AC 
+                       UART0_C2_TI_RI
+                               EQU              (UART0_C2_TIE_MASK :OR: UART0_C
+2_T_RI)
+  139 00000000         ;-------------------------------------------------------
+                       --------
+  140 00000000         ;UART0_C3
+  141 00000000         ;0-->7:R8T9=9th data bit for receiver (not used M=0)
+  142 00000000         ;           10th data bit for transmitter (not used M10=
+                       0)
+  143 00000000         ;0-->6:R9T8=9th data bit for transmitter (not used M=0)
+  144 00000000         ;           10th data bit for receiver (not used M10=0)
+  145 00000000         ;0-->5:TXDIR=UART_TX pin direction in single-wire mode
+  146 00000000         ;            (no effect LOOPS=0)
+  147 00000000         ;0-->4:TXINV=transmit data inversion (not inverted)
+  148 00000000         ;0-->3:ORIE=overrun IE for OR (disabled)
+  149 00000000         ;0-->2:NEIE=noise error IE for NF (disabled)
+  150 00000000         ;0-->1:FEIE=framing error IE for FE (disabled)
+  151 00000000         ;0-->0:PEIE=parity error IE for PF (disabled)
+  152 00000000 00000000 
+                       UART0_C3_NO_TXINV
+                               EQU              0x00
+  153 00000000         ;-------------------------------------------------------
+                       --------
+  154 00000000         ;UART0_C4
+  155 00000000         ;    0-->  7:MAEN1=match address mode enable 1 (disabled
+                       )
+  156 00000000         ;    0-->  6:MAEN2=match address mode enable 2 (disabled
+                       )
+  157 00000000         ;    0-->  5:M10=10-bit mode select (not selected)
+  158 00000000         ;01111-->4-0:OSR=over sampling ratio (16)
+
+
+
+ARM Macro Assembler    Page 5 Timer driver
+
+
+  159 00000000         ;               = 1 + OSR for 3 <= OSR <= 31
+  160 00000000         ;               = 16 for 0 <= OSR <= 2 (invalid values)
+  161 00000000 0000000F 
+                       UART0_C4_OSR_16
+                               EQU              0x0F
+  162 00000000 0000000F 
+                       UART0_C4_NO_MATCH_OSR_16
+                               EQU              UART0_C4_OSR_16
+  163 00000000         ;-------------------------------------------------------
+                       --------
+  164 00000000         ;UART0_C5
+  165 00000000         ;  0-->  7:TDMAE=transmitter DMA enable (disabled)
+  166 00000000         ;  0-->  6:Reserved; read-only; always 0
+  167 00000000         ;  0-->  5:RDMAE=receiver full DMA enable (disabled)
+  168 00000000         ;000-->4-2:Reserved; read-only; always 0
+  169 00000000         ;  0-->  1:BOTHEDGE=both edge sampling (rising edge only
+                       )
+  170 00000000         ;  0-->  0:RESYNCDIS=resynchronization disable (enabled)
+                       
+  171 00000000 00000000 
+                       UART0_C5_NO_DMA_SSR_SYNC
+                               EQU              0x00
+  172 00000000         ;-------------------------------------------------------
+                       --------
+  173 00000000         ;UART0_S1
+  174 00000000         ;0-->7:TDRE=transmit data register empty flag; read-only
+                       
+  175 00000000         ;0-->6:TC=transmission complete flag; read-only
+  176 00000000         ;0-->5:RDRF=receive data register full flag; read-only
+  177 00000000         ;1-->4:IDLE=idle line flag; write 1 to clear (clear)
+  178 00000000         ;1-->3:OR=receiver overrun flag; write 1 to clear (clear
+                       )
+  179 00000000         ;1-->2:NF=noise flag; write 1 to clear (clear)
+  180 00000000         ;1-->1:FE=framing error flag; write 1 to clear (clear)
+  181 00000000         ;1-->0:PF=parity error flag; write 1 to clear (clear)
+  186 00000000 0000001F 
+                       UART0_S1_CLEAR_FLAGS
+                               EQU              (UART0_S1_IDLE_MASK :OR:      
+                        UART0_S1_OR_MASK :OR:                              UAR
+T0_S1_NF_MASK :OR:                              UART0_S1_FE_MASK :OR:        
+                      UART0_S1_PF_MASK)
+  187 00000000         ;-------------------------------------------------------
+                       --------
+  188 00000000         ;UART0_S2
+  189 00000000         ;1-->7:LBKDIF=LIN break detect interrupt flag (clear)
+  190 00000000         ;             write 1 to clear
+  191 00000000         ;1-->6:RXEDGIF=RxD pin active edge interrupt flag (clear
+                       )
+  192 00000000         ;              write 1 to clear
+  193 00000000         ;0-->5:(reserved); read-only; always 0
+  194 00000000         ;0-->4:RXINV=receive data inversion (disabled)
+  195 00000000         ;0-->3:RWUID=receive wake-up idle detect
+  196 00000000         ;0-->2:BRK13=break character generation length (10)
+  197 00000000         ;0-->1:LBKDE=LIN break detect enable (disabled)
+  198 00000000         ;0-->0:RAF=receiver active flag; read-only
+  200 00000000 000000C0 
+                       UART0_S2_NO_RXINV_BRK10_NO_LBKDETECT_CLEAR_FLAGS
+                               EQU              (UART0_S2_LBKDIF_MASK :OR: UART
+0_S2_RXEDGIF_MASK)
+
+
+
+ARM Macro Assembler    Page 6 Timer driver
+
+
+  201 00000000         ;-------------------------------------------------------
+                       --------
+  202 00000000         ;*******************************************************
+                       *********
+  203 00000000         ;EQUates
+  204 00000000         ; Queue management record field offsets
+  205 00000000 00000000 
+                       IN_PTR  EQU              0
+  206 00000000 00000004 
+                       OUT_PTR EQU              4
+  207 00000000 00000008 
+                       BUF_STRT
+                               EQU              8
+  208 00000000 0000000C 
+                       BUF_PAST
+                               EQU              12
+  209 00000000 00000010 
+                       BUF_SIZE
+                               EQU              16
+  210 00000000 00000011 
+                       NUM_ENQD
+                               EQU              17
+  211 00000000         ; Queue structure sizes
+  212 00000000 00000004 
+                       Q_BUF_SZ
+                               EQU              4           ;Queue contents
+  213 00000000 00000012 
+                       Q_REC_SZ
+                               EQU              18          ;Queue management r
+                                                            ecord
+  214 00000000 00000028 
+                       TX_BUF_SZ
+                               EQU              40          ; Queue buffer size
+                                                             for RxBuffer and T
+                                                            xBuffer
+  215 00000000 00000005 
+                       RX_BUF_SZ
+                               EQU              5           ; Queue buffer size
+                                                             for RxBuffer and T
+                                                            xBuffer
+  216 00000000         
+  217 00000000                 MACRO
+  218 00000000         $label  P                $string
+  219 00000000                 PUSH             {R0}
+  220 00000000                 LDR              R0,=$string
+  221 00000000                 BL               printf
+  222 00000000                 POP              {R0}
+  223 00000000                 MEND
+  224 00000000         
+  225 00000000         ;*******************************************************
+                       *********
+  226 00000000         ;Program
+  227 00000000         ;Linker requires Reset_Handler
+  228 00000000                 AREA             MyCode,CODE,READONLY
+  229 00000000                 ENTRY
+  230 00000000                 EXPORT           Reset_Handler
+  231 00000000                 IMPORT           Startup
+  232 00000000         Reset_Handler
+                               PROC             {}
+
+
+
+ARM Macro Assembler    Page 7 Timer driver
+
+
+  233 00000000         main
+  234 00000000         ;-------------------------------------------------------
+                       --------
+  235 00000000         ;Mask interrupts
+  236 00000000 B672            CPSID            I
+  237 00000002         ;KL05 system startup with 48-MHz system clock
+  238 00000002 F7FF FFFE       BL               Startup
+  239 00000006 F7FF FFFE       BL               Init_PIT_IRQ
+  240 0000000A F7FF FFFE       BL               Init_UART0_IRQ
+  241 0000000E B662            CPSIE            I           ; Unmask interrupts
+                                                            
+  242 00000010         ;-------------------------------------------------------
+                       --------
+  243 00000010         ;>>>>> begin main program code <<<<<
+  244 00000010 4908            LDR              R1,=StopWatchRecord
+  245 00000012         __9     P                newline
+  219 00000012 B401            PUSH             {R0}
+  220 00000014 4808            LDR              R0,=newline
+  221 00000016 F7FF FFFE       BL               printf
+  222 0000001A BC01            POP              {R0}
+  246 0000001C         main_loop                            ; Get input
+  247 0000001C         __0     P                prompt      ; Print the prompt 
+                                                            string
+  219 0000001C B401            PUSH             {R0}
+  220 0000001E 4807            LDR              R0,=prompt
+  221 00000020 F7FF FFFE       BL               printf
+  222 00000024 BC01            POP              {R0}
+  248 00000026 F7FF FFFE       BL               GetChar
+  249 0000002A F7FF FFFE       BL               HandleCommand
+  250 0000002E E7F5            B                main_loop
+  251 00000030         
+  252 00000030         ;>>>>>   end main program code <<<<<
+  253 00000030         ;Stay here
+  254 00000030 E7FE            B                .
+  255 00000032                 ENDP
+  256 00000032 00 00           ALIGN
+  257 00000034 00000000 
+              00000000 
+              00000000         LTORG
+  258 00000040         ;>>>>> begin subroutine code <<<<<
+  259 00000040         
+  260 00000040         ; Handle a command input
+  261 00000040         ; Subroutines used:
+  262 00000040         ;   Dequene
+  263 00000040         ;   Enqueue
+  264 00000040         ;   printf
+  265 00000040         ;   PutChar
+  266 00000040         ; Input:
+  267 00000040         ;   R0: input command (case insensitive)
+  268 00000040         ;   R1: Pointer to counter structure
+  269 00000040         ; Output (None)
+  270 00000040         ; Modified Registers (None)
+  271 00000040         HandleCommand
+                               PROC             {R0-R12}
+  272 00000040 B51F            PUSH             {R0-R4,LR}
+  273 00000042 00000061 
+                       AS_L_S  EQU              'a'
+  274 00000042 0000007A 
+                       AS_L_E  EQU              'z'
+
+
+
+ARM Macro Assembler    Page 8 Timer driver
+
+
+  275 00000042 00000041 
+                       AS_U_S  EQU              'A'
+  276 00000042 0000005A 
+                       AS_U_E  EQU              'Z'
+  277 00000042         
+  278 00000042         ; Convert the character to upper-case
+  279 00000042 0002            MOVS             R2,R0
+  280 00000044 2A41            CMP              R2,#AS_U_S
+  281 00000046 DB4B            BLT              end_handle
+  282 00000048 2A5A            CMP              R2,#AS_U_E
+  283 0000004A DD01            BLE              do_cmd      ; Already in upperc
+                                                            ase
+  284 0000004C         ; Convert to upper case
+  285 0000004C 3A20            SUBS             R2,R2,#(AS_L_S - AS_U_S)
+  286 0000004E E7FF            B                do_cmd
+  287 00000050         
+  288 00000050 2A43    do_cmd  CMP              R2,#'C'
+  289 00000052 D00D            BEQ              do_clear
+  290 00000054 2A44            CMP              R2,#'D'
+  291 00000056 D015            BEQ              do_display
+  292 00000058 2A48            CMP              R2,#'H'
+  293 0000005A D020            BEQ              do_help
+  294 0000005C 2A50            CMP              R2,#'P'
+  295 0000005E D02B            BEQ              do_pause
+  296 00000060 2A54            CMP              R2,#'T'
+  297 00000062 D033            BEQ              do_time
+  298 00000064                 P                newline     ; Invalid character
+                                                            , don't print it
+  219 00000064 B401            PUSH             {R0}
+  220 00000066 48FC            LDR              R0,=newline
+  221 00000068 F7FF FFFE       BL               printf
+  222 0000006C BC01            POP              {R0}
+  299 0000006E E037            B                end_handle
+  300 00000070         
+  301 00000070         do_clear                             ; Clear the counter
+                                                             in the
+  302 00000070         ; timing record structure
+  303 00000070 F7FF FFFE       BL               PutChar     ; print the command
+                                                             character
+  304 00000074                 P                newline
+  219 00000074 B401            PUSH             {R0}
+  220 00000076 48F8            LDR              R0,=newline
+  221 00000078 F7FF FFFE       BL               printf
+  222 0000007C BC01            POP              {R0}
+  305 0000007E 2000            MOVS             R0,#0
+  306 00000080 6008            STR              R0,[R1,#0]
+  307 00000082 E02D            B                end_handle
+  308 00000084         
+  309 00000084         do_display                           ; Display the value
+                                                             of the counter
+  310 00000084         ; Load the printf arguments
+  311 00000084 F7FF FFFE       BL               PutChar     ; print the command
+                                                             character
+  312 00000088                 P                newline
+  219 00000088 B401            PUSH             {R0}
+  220 0000008A 48F3            LDR              R0,=newline
+  221 0000008C F7FF FFFE       BL               printf
+  222 00000090 BC01            POP              {R0}
+  313 00000092 48F2            LDR              R0,=display
+
+
+
+ARM Macro Assembler    Page 9 Timer driver
+
+
+  314 00000094 680A            LDR              R2,[R1,#0]
+  315 00000096 B404            PUSH             {R2}
+  316 00000098 F7FF FFFE       BL               printf
+  317 0000009C E020            B                end_handle
+  318 0000009E         
+  319 0000009E         do_help                              ;
+  320 0000009E F7FF FFFE       BL               PutChar     ; print the command
+                                                             character
+  321 000000A2                 P                newline
+  219 000000A2 B401            PUSH             {R0}
+  220 000000A4 48EC            LDR              R0,=newline
+  221 000000A6 F7FF FFFE       BL               printf
+  222 000000AA BC01            POP              {R0}
+  322 000000AC         __h     P                help
+  219 000000AC B401            PUSH             {R0}
+  220 000000AE 48EC            LDR              R0,=help
+  221 000000B0 F7FF FFFE       BL               printf
+  222 000000B4 BC01            POP              {R0}
+  323 000000B6 E013            B                end_handle
+  324 000000B8         
+  325 000000B8         do_pause                             ; Stop timing
+  326 000000B8 F7FF FFFE       BL               PutChar     ; print the command
+                                                             character
+  327 000000BC                 P                newline
+  219 000000BC B401            PUSH             {R0}
+  220 000000BE 48E6            LDR              R0,=newline
+  221 000000C0 F7FF FFFE       BL               printf
+  222 000000C4 BC01            POP              {R0}
+  328 000000C6 2000            MOVS             R0,#0
+  329 000000C8 7108            STRB             R0,[R1,#4]
+  330 000000CA E009            B                end_handle
+  331 000000CC         
+  332 000000CC         do_time                              ; Start timing
+  333 000000CC F7FF FFFE       BL               PutChar     ; print the command
+                                                             character
+  334 000000D0                 P                newline
+  219 000000D0 B401            PUSH             {R0}
+  220 000000D2 48E1            LDR              R0,=newline
+  221 000000D4 F7FF FFFE       BL               printf
+  222 000000D8 BC01            POP              {R0}
+  335 000000DA 2001            MOVS             R0,#1
+  336 000000DC 7108            STRB             R0,[R1,#4]
+  337 000000DE E7FF            B                end_handle
+  338 000000E0 BD1F    end_handle
+                               POP              {R0-R4,PC}
+  339 000000E2                 ENDP
+  340 000000E2         
+  341 000000E2         ; This subroutine is a printf() clone with the following
+                       
+  342 000000E2         ; formats defined:
+  343 000000E2         ;    %x: hex
+  344 000000E2         ;    %d: decimal
+  345 000000E2         ;    %s: string
+  346 000000E2         ;    %b: single byte decimal
+  347 000000E2         ;    %c: char
+  348 000000E2         ; Subroutines used:
+  349 000000E2         ;    PutChar
+  350 000000E2         ;    PutNumHex (%x)
+  351 000000E2         ;    PutNumU   (%d)
+
+
+
+ARM Macro Assembler    Page 10 Timer driver
+
+
+  352 000000E2         ;    PutStringSB (%s)
+  353 000000E2         ;    PutNumUB (%b)
+  354 000000E2         ;    printf (recursive call on error)
+  355 000000E2         ; Input Registers:
+  356 000000E2         ;    R0: Pointer to the format string
+  357 000000E2         ;    Push all format arguments to the stack
+  358 000000E2         ; Output (None)
+  359 000000E2         ; Modified Registers (None)
+  360 000000E2         printf  PROC             {R0-R12}
+  361 000000E2         ; Because the stack is used to pass parameters to
+  362 000000E2         ; this subroutines. We can't modify the stack pointer
+  363 000000E2         ; before moving through the format string.
+  364 000000E2         ; Use the memory as a stack
+  365 000000E2 B420            PUSH             {R5}
+  366 000000E4 4DDF            LDR              R5,=printf_static
+  367 000000E6 6028            STR              R0,[R5,#0]
+  368 000000E8 6069            STR              R1,[R5,#4]
+  369 000000EA 60AA            STR              R2,[R5,#8]
+  370 000000EC 60EB            STR              R3,[R5,#12]
+  371 000000EE 612C            STR              R4,[R5,#16]
+  372 000000F0 BC20            POP              {R5}
+  373 000000F2         
+  374 000000F2 0001            MOVS             R1,R0
+  375 000000F4         
+  376 000000F4         ; Store the return pointer
+  377 000000F4 B500            PUSH             {LR}
+  378 000000F6 BC10            POP              {R4}
+  379 000000F8         
+  380 000000F8 780A    printf_loop
+                               LDRB             R2,[R1,#0]
+  381 000000FA 4212            TST              R2,R2
+  382 000000FC D032            BEQ              printf_end  ;  End of string
+  383 000000FE 2A25            CMP              R2,#'%'     ; Format character
+  384 00000100 D003            BEQ              printf_fmt
+  385 00000102 0010            MOVS             R0,R2
+  386 00000104 F7FF FFFE       BL               PutChar
+  387 00000108 E02A            B                printf_continue
+  388 0000010A 1C49    printf_fmt
+                               ADDS             R1,R1,#1
+  389 0000010C 780A            LDRB             R2,[R1,#0]
+  390 0000010E 2A78            CMP              R2,#'x'     ; Print a hex strin
+                                                            g
+  391 00000110 D00F            BEQ              printf_h
+  392 00000112 2A64            CMP              R2,#'d'     ; Print a decimal s
+                                                            tring
+  393 00000114 D011            BEQ              printf_d
+  394 00000116 2A73            CMP              R2,#'s'     ; Print a string
+  395 00000118 D013            BEQ              printf_s
+  396 0000011A 2A63            CMP              R2,#'c'
+  397 0000011C D01C            BEQ              printf_c
+  398 0000011E 2A62            CMP              R2,#'b'     ; Print a single by
+                                                            te
+  399 00000120 D016            BEQ              printf_b
+  400 00000122         ; INVALID FORMAT STRING
+  401 00000122         ; Print the error string
+  402 00000122 B420            PUSH             {R5}
+  403 00000124 6869            LDR              R1,[R5,#4]
+  404 00000126 BC20            POP              {R5}
+  405 00000128         
+
+
+
+ARM Macro Assembler    Page 11 Timer driver
+
+
+  406 00000128 B402            PUSH             {R1}
+  407 0000012A 49CF            LDR              R1,=invalid
+  408 0000012C F7FF FFFE       BL               printf
+  409 00000130 E7FE            B                .           ; Invalid format st
+                                                            ring (STOP)
+  410 00000132         printf_h                             ; Print the current
+                                                             number in R0
+  411 00000132 BC01            POP              {R0}
+  412 00000134 F7FF FFFE       BL               PutNumHex
+  413 00000138 E012            B                printf_continue
+  414 0000013A         printf_d                             ; Print the current
+                                                             digit in R0
+  415 0000013A BC01            POP              {R0}
+  416 0000013C F7FF FFFE       BL               PutNumU
+  417 00000140 E00E            B                printf_continue
+  418 00000142         printf_s                             ; Print the string 
+                                                            in R0
+  419 00000142 BC01            POP              {R0}
+  420 00000144 B402            PUSH             {R1}
+  421 00000146 2164            MOVS             R1,#100     ; Max string length
+                                                             of 100
+  422 00000148 F7FF FFFE       BL               PutStringSB
+  423 0000014C BC02            POP              {R1}
+  424 0000014E E007            B                printf_continue
+  425 00000150         printf_b                             ; Print the single 
+                                                            byte value in R0
+  426 00000150 BC01            POP              {R0}
+  427 00000152 F7FF FFFE       BL               PutNumUB
+  428 00000156 E003            B                printf_continue
+  429 00000158         printf_c                             ; Print the single 
+                                                            char value in R0
+  430 00000158 BC01            POP              {R0}
+  431 0000015A F7FF FFFE       BL               PutChar
+  432 0000015E E7FF            B                printf_continue
+  433 00000160 1C49    printf_continue
+                               ADDS             R1,R1,#1
+  434 00000162 E7C9            B                printf_loop
+  435 00000164         printf_end                           ; Restore the link 
+                                                            register
+  436 00000164 B410            PUSH             {R4}        ; This will be POP'
+                                                            ed to PC
+  437 00000166         
+  438 00000166         ; Restore registers from memory
+  439 00000166 B420            PUSH             {R5}
+  440 00000168 4DBE            LDR              R5,=printf_static
+  441 0000016A 6828            LDR              R0,[R5,#0]
+  442 0000016C 6869            LDR              R1,[R5,#4]
+  443 0000016E 68AA            LDR              R2,[R5,#8]
+  444 00000170 68EB            LDR              R3,[R5,#12]
+  445 00000172 692C            LDR              R4,[R5,#16]
+  446 00000174 BC20            POP              {R5}
+  447 00000176         
+  448 00000176 BD00            POP              {PC}
+  449 00000178                 ENDP
+  450 00000178         
+  451 00000178         ; Initialize a queue structure
+  452 00000178         ; Subroutines Used: (none)
+  453 00000178         ; Input:
+  454 00000178         ;   R0: Pointer to the first address of the circular buf
+
+
+
+ARM Macro Assembler    Page 12 Timer driver
+
+
+                       fer
+  455 00000178         ;   R1: Pointer to the start of the queue structure
+  456 00000178         ;   R2: Size of the circular buffer pointed to by R0
+  457 00000178         ; Output (None)
+  458 00000178         ; Modified Registers (None)
+  459 00000178         InitQueue
+                               PROC             {R0-R12}
+  460 00000178 B407            PUSH             {R0-R2}
+  461 0000017A 6008            STR              R0,[R1,#IN_PTR]
+  462 0000017C 6048            STR              R0,[R1,#OUT_PTR]
+  463 0000017E 6088            STR              R0,[R1,#BUF_STRT]
+  464 00000180 1880            ADDS             R0,R0,R2
+  465 00000182 60C8            STR              R0,[R1,#BUF_PAST]
+  466 00000184 740A            STRB             R2,[R1,#BUF_SIZE]
+  467 00000186 2000            MOVS             R0,#0
+  468 00000188 7448            STRB             R0,[R1,#NUM_ENQD]
+  469 0000018A BC07            POP              {R0-R2}
+  470 0000018C 4770            BX               LR
+  471 0000018E                 ENDP
+  472 0000018E         
+  473 0000018E         ; Emplace a character into the queue structure.
+  474 0000018E         ; If the queue is already full, indicate failure
+  475 0000018E         ; by setting the C flag in the APSR. A cleared C flag
+  476 0000018E         ; indicates success.
+  477 0000018E         ; Subroutes used: (none)
+  478 0000018E         ; Input:  R0:  Character to enqueue
+  479 0000018E         ;         R1:  Address of queue record structure
+  480 0000018E         ; Output:  PSR C flag:  Success(0) or Failure (1)
+  481 0000018E         ; Modify:  APSR
+  482 0000018E         ; All other registers remain unchanged on return
+  483 0000018E         Enqueue PROC             {R0-R12}
+  484 0000018E B40C            PUSH             {R2,R3}
+  485 00000190 7C4A            LDRB             R2,[R1,#NUM_ENQD]
+  486 00000192 7C0B            LDRB             R3,[R1,#BUF_SIZE]
+  487 00000194 429A            CMP              R2,R3       ; Check if the queu
+                                                            e is full
+  488 00000196 DA11            BGE              en_full
+  489 00000198 680B            LDR              R3,[R1,#IN_PTR]
+  490 0000019A 7018            STRB             R0,[R3,#0]  ; Put new element a
+                                                            t memory location p
+                                                            ointed by InPointer
+                                                            
+  491 0000019C         ; Increment NumberEnqueued
+  492 0000019C 1C52            ADDS             R2,R2,#1
+  493 0000019E 744A            STRB             R2,[R1,#NUM_ENQD]
+  494 000001A0         
+  495 000001A0         ; Increment InPointer
+  496 000001A0 1C5B            ADDS             R3,R3,#1
+  497 000001A2 68CA            LDR              R2,[R1,#BUF_PAST]
+  498 000001A4 4293            CMP              R3,R2
+  499 000001A6 DB00            BLT              en_str      ; If (R1->in_ptr < 
+                                                            R1->BUF_PAST) goto 
+                                                            en_str
+  500 000001A8         ; IN_PTR is past the end of the queue
+  501 000001A8         ; We need to set it back to the start of the queue
+  502 000001A8 688B            LDR              R3,[R1,#BUF_STRT]
+  503 000001AA 600B    en_str  STR              R3,[R1,#IN_PTR]
+  504 000001AC         ; Clear the carry flag  (No error occured)
+  505 000001AC F3EF 8200       MRS              R2,APSR
+
+
+
+ARM Macro Assembler    Page 13 Timer driver
+
+
+  506 000001B0 2320            MOVS             R3,#0x20
+  507 000001B2 061B            LSLS             R3,R3,#24
+  508 000001B4 439A            BICS             R2,R2,R3
+  509 000001B6 F382 8800       MSR              APSR,R2
+  510 000001BA E006            B                en_done     ; Don't clear the A
+                                                            PSR C-flag
+  511 000001BC         en_full                              ; Set the carry fla
+                                                            g  (Error occured)
+  512 000001BC F3EF 8200       MRS              R2,APSR
+  513 000001C0 2320            MOVS             R3,#0x20
+  514 000001C2 061B            LSLS             R3,R3,#24
+  515 000001C4 431A            ORRS             R2,R2,R3
+  516 000001C6 F382 8800       MSR              APSR,R2
+  517 000001CA BC0C    en_done POP              {R2,R3}
+  518 000001CC 4770            BX               LR
+  519 000001CE                 ENDP
+  520 000001CE         
+  521 000001CE         ; Remove the next item from the queue structure.
+  522 000001CE         ; If the queue is already empty, indicate failure by
+  523 000001CE         ; setting the C flag in the APSR. A cleared C flag
+  524 000001CE         ; indicates success.
+  525 000001CE         ; Subroutines used: (none)
+  526 000001CE         ; Input:  R1:  Address of queue record structure 
+  527 000001CE         ; Output: R0:  Character dequeued 
+  528 000001CE         ;         PSR C flag:  Success(0) or Failure (1)
+  529 000001CE         ; Modify: R0
+  530 000001CE         ; APSR 
+  531 000001CE         ; All other registers remain unchanged on return
+  532 000001CE         Dequeue PROC             {R1-R12}
+  533 000001CE B41C            PUSH             {R2-R4}
+  534 000001D0 7C4A            LDRB             R2,[R1,#NUM_ENQD] 
+                                                            ; R2 = NUM_ENQ
+  535 000001D2 684B            LDR              R3,[R1,#OUT_PTR] ; R3 = OUT_PTR
+                                                            
+  536 000001D4 2A00            CMP              R2,#0
+  537 000001D6 DD10            BLE              de_empty    ; No more items in 
+                                                            the queue
+  538 000001D8 7818            LDRB             R0,[R3,#0]  ; Get item at OUT_P
+                                                            TR
+  539 000001DA         ; Decrement number enqueued
+  540 000001DA 1E52            SUBS             R2,R2,#1
+  541 000001DC 744A            STRB             R2,[R1,#NUM_ENQD]
+  542 000001DE         
+  543 000001DE         ; Increment OutPointer
+  544 000001DE 1C5B            ADDS             R3,R3,#1
+  545 000001E0 68CC            LDR              R4,[R1,#BUF_PAST]
+  546 000001E2 42A3            CMP              R3,R4
+  547 000001E4 DB00            BLT              de_str      ; If (R1->out_ptr <
+                                                             R1->BUF_PAST) goto
+                                                             de_str
+  548 000001E6         ; OUT_PTR is past the end of the queue
+  549 000001E6         ; We need to set it back to the start of the queue
+  550 000001E6 688B            LDR              R3,[R1,#BUF_STRT]
+  551 000001E8 604B    de_str  STR              R3,[R1,#OUT_PTR]
+  552 000001EA         ; Clear the carry flag (No error occured)
+  553 000001EA F3EF 8200       MRS              R2,APSR
+  554 000001EE 2320            MOVS             R3,#0x20
+  555 000001F0 061B            LSLS             R3,R3,#24
+  556 000001F2 439A            BICS             R2,R2,R3
+
+
+
+ARM Macro Assembler    Page 14 Timer driver
+
+
+  557 000001F4 F382 8800       MSR              APSR,R2
+  558 000001F8 E006            B                de_done
+  559 000001FA         de_empty                             ; Set the carry fla
+                                                            g (Error occured)
+  560 000001FA F3EF 8200       MRS              R2,APSR
+  561 000001FE 2320            MOVS             R3,#0x20
+  562 00000200 061B            LSLS             R3,R3,#24
+  563 00000202 431A            ORRS             R2,R2,R3
+  564 00000204 F382 8800       MSR              APSR,R2
+  565 00000208 BC1C    de_done POP              {R2-R4}
+  566 0000020A 4770            BX               LR
+  567 0000020C                 ENDP
+  568 0000020C         
+  569 0000020C         
+  570 0000020C         ; Print a 32-bit number in hex
+  571 0000020C         ; Subroutines used:
+  572 0000020C         ;   PutDigHex
+  573 0000020C         ; Input parameter:
+  574 0000020C         ;   R0: number to print in hexadecimal (unsigned word va
+                       lue)
+  575 0000020C         ; Output parameter: (none)
+  576 0000020C         PutNumHex
+                               PROC             {R0-R12}
+  577 0000020C 0000000F 
+                       RIGHT_NIBBLE_MASK
+                               EQU              0x0F
+  578 0000020C B51F            PUSH             {R0-R4,LR}
+  579 0000020E         ; There are 4 bytes to print
+  580 0000020E 2100            MOVS             R1,#0       ; Use R1 as an iter
+                                                            ator
+  581 00000210 2318            MOVS             R3,#24
+  582 00000212 240F            MOVS             R4,#RIGHT_NIBBLE_MASK
+  583 00000214 41D8            RORS             R0,R0,R3    ; Move the MSB to t
+                                                            he LSB
+  584 00000216 2904    pnh_loop
+                               CMP              R1,#4
+  585 00000218 DA0A            BGE              pnh_done
+  586 0000021A         ; Print the most significant nibble
+  587 0000021A 0902            LSRS             R2,R0,#4
+  588 0000021C 4022            ANDS             R2,R2,R4
+  589 0000021E F7FF FFFE       BL               PutDigHex   ; Print this digit
+  590 00000222         ; Print the least significant nibble
+  591 00000222 0002            MOVS             R2,R0
+  592 00000224 4022            ANDS             R2,R2,R4
+  593 00000226 F7FF FFFE       BL               PutDigHex
+  594 0000022A 41D8            RORS             R0,R0,R3    ; Move to the next 
+                                                            byte
+  595 0000022C 1C49            ADDS             R1,R1,#1    ; i++
+  596 0000022E E7F2            B                pnh_loop
+  597 00000230 BD1F    pnh_done
+                               POP              {R0-R4,PC}
+  598 00000232                 ENDP
+  599 00000232         
+  600 00000232         ; Print a single hex digit
+  601 00000232         ; stored in R2
+  602 00000232         ; Subroutines used:
+  603 00000232         ;   PutChar
+  604 00000232         ; Input parameter:
+  605 00000232         ;   R2 Hex digit to print
+
+
+
+ARM Macro Assembler    Page 15 Timer driver
+
+
+  606 00000232         PutDigHex
+                               PROC             {R0-R12}
+  607 00000232 0000000A 
+                       ASCII_LETTER
+                               EQU              10          ; Any values greate
+                                                            r than or equal to 
+                                                            this will be a lett
+                                                            er A-F
+  608 00000232 00000030 
+                       ASCII_DIG_OFF
+                               EQU              '0'
+  609 00000232 00000039 
+                       ASCII_DIG_LAST
+                               EQU              '9'
+  610 00000232 00000007 
+                       ASCII_LET_OFF
+                               EQU              ('A' - '0' - 10)
+  611 00000232 B50D            PUSH             {R0,R2,R3,LR}
+  612 00000234 23FF            MOVS             R3,#0xFF
+  613 00000236 401A            ANDS             R2,R2,R3
+  614 00000238 3230            ADDS             R2,#ASCII_DIG_OFF
+  615 0000023A 2A39            CMP              R2,#ASCII_DIG_LAST
+  616 0000023C DB00            BLT              put_dig
+  617 0000023E 1DD2            ADDS             R2,R2,#ASCII_LET_OFF
+  618 00000240 0010    put_dig MOVS             R0,R2
+  619 00000242 F7FF FFFE       BL               PutChar
+  620 00000246 BD0D            POP              {R0,R2,R3,PC}
+  621 00000248                 ENDP
+  622 00000248         
+  623 00000248         ; Prints to the terminal screen the decimal representati
+                       on of the
+  624 00000248         ; unsigned byte value in R0
+  625 00000248         ; Subroutines Used:
+  626 00000248         ;  PutNumU
+  627 00000248         ; Input parameter:
+  628 00000248         ;   R0:number to print in decimal (unsigned byte value)
+  629 00000248         ;Output parameter: (none)
+  630 00000248         PutNumUB
+                               PROC             {R0-R12}
+  631 00000248 B503            PUSH             {R0,R1,LR}
+  632 0000024A 21FF            MOVS             R1,#BYTE_MASK
+  633 0000024C 4008            ANDS             R0,R0,R1
+  634 0000024E F7FF FFFE       BL               PutNumU
+  635 00000252 BD03            POP              {R0,R1,PC}
+  636 00000254                 ENDP
+  637 00000254         
+  638 00000254         ; Print a number in decimal using the ascii
+  639 00000254         ; characters
+  640 00000254         ; SUBROUTINES USED
+  641 00000254         ;   - PutChar (Print each digit)
+  642 00000254         ;   - DIVU
+  643 00000254         ; PARAMS
+  644 00000254         ;   INPUT R0: Number to print (unsigned word value)
+  645 00000254         ;   OUTPUT  : NONE
+  646 00000254         PutNumU PROC             {R0-R12}
+  647 00000254 B507            PUSH             {R0-R2,LR}
+  648 00000256 0000000A 
+                       printbase
+                               EQU              10
+
+
+
+ARM Macro Assembler    Page 16 Timer driver
+
+
+  649 00000256 00000030 
+                       asciioffset
+                               EQU              '0'
+  650 00000256         ; put_num_u(U32 r0)
+  651 00000256         ; while (r0 != 0)
+  652 00000256         ;   (add r0 % 10 to stack)
+  653 00000256         ;   r0 /= 10
+  654 00000256         ; print the stack backwards
+  655 00000256 2800            CMP              R0,#0       ; Just print a '0'
+  656 00000258 D011            BEQ              numzero
+  657 0000025A         
+  658 0000025A 2200            MOVS             R2,#0       ; Count the number 
+                                                            of digits
+  659 0000025C 2800    numwhile
+                               CMP              R0,#0       ; while (r0 != 0)
+  660 0000025E D005            BEQ              numwhile2
+  661 00000260 210A            MOVS             R1,#printbase ; Always divide b
+                                                            y the base
+  662 00000262 F7FF FFFE       BL               DIVU        ; R0 = R0 / base; R
+                                                            0 % base
+  663 00000266 B402            PUSH             {R1}        ; Need to print the
+                                                            se digits backwards
+                                                            
+  664 00000268 1C52            ADDS             R2,R2,#1    ; r2++
+  665 0000026A E7F7            B                numwhile
+  666 0000026C 2A01    numwhile2
+                               CMP              R2,#1       ; while (r2 >= 1)
+  667 0000026E DB09            BLT              numdone
+  668 00000270 BC02            POP              {R1}
+  669 00000272 0008            MOVS             R0,R1
+  670 00000274 3030            ADDS             R0,R0,#asciioffset ; Print the 
+                                                            next character (asc
+                                                            ii not just value)
+  671 00000276 1E52            SUBS             R2,R2,#1
+  672 00000278 F7FF FFFE       BL               PutChar
+  673 0000027C E7F6            B                numwhile2
+  674 0000027E 2030    numzero MOVS             R0,#'0'
+  675 00000280 F7FF FFFE       BL               PutChar
+  676 00000284 BD07    numdone POP              {R0-R2,PC}
+  677 00000286                 ENDP
+  678 00000286         
+  679 00000286         ; Calculate the quotient and remainder of
+  680 00000286         ; two unsigned word values.
+  681 00000286         ; SUBROUTINES: None
+  682 00000286         ; PARAMS:
+  683 00000286         ;   INPUT R0: dividend (unsigned word)
+  684 00000286         ;   INPUT R1: divisor  (unsigned word)
+  685 00000286         ;   OUTPUT R0: quotient (unsigned word)
+  686 00000286         ;   OUTPUT R1: remainder (unsigned word)
+  687 00000286         DIVU    PROC             {R2-R12}
+  688 00000286 B500            PUSH             {LR}
+  689 00000288 B4FC            PUSH             {R2-R7}
+  690 0000028A 2900            CMP              R1,#0
+  691 0000028C D01D            BEQ              DIVU_0      ; Don't try to divi
+                                                            de by zero
+  692 0000028E 00000080 
+                       LEFT_MASK
+                               EQU              0x80        ; Used to get most 
+                                                            significant bit of 
+
+
+
+ARM Macro Assembler    Page 17 Timer driver
+
+
+                                                            a byte
+  693 0000028E 0000001F 
+                       SHIFT32 EQU              31
+  694 0000028E         ; Compute N / D
+  695 0000028E         ; Use binary long division
+  696 0000028E         ; R = 0 (Use R2)
+  697 0000028E         ; Q = 0 (Use R3)
+  698 0000028E         ; for (i = 31; i >= 0; i--) {
+  699 0000028E         ;   R = R << 1
+  700 0000028E         ;   R |= (N & LEFT_MASK) >> 31
+  701 0000028E         ;   N = N << 1
+  702 0000028E         ;   if R >= D {
+  703 0000028E         ;       R = R - D
+  704 0000028E         ;       Q |= 1 << i
+  705 0000028E         ;   }
+  706 0000028E         ; }
+  707 0000028E 2200            MOVS             R2,#0       ; Init Remainder
+  708 00000290 2300            MOVS             R3,#0       ; Init the Quotient
+                                                            
+  709 00000292 241F            MOVS             R4,#SHIFT32 ; Init the iterator
+                                                             (i)
+  710 00000294 2601            MOVS             R6,#1       ; Used for Q = Q | 
+                                                            (1 << i)
+  711 00000296 2C00    DIV_FOR CMP              R4,#0       ; if (i >= 0)
+  712 00000298 DB0D            BLT              DIVU_FINISH ; Finished loop
+  713 0000029A 0052            LSLS             R2,R2,#1    ; R = R << 1
+  714 0000029C 0FC5            LSRS             R5,R0,#SHIFT32 ; R5 = most sign
+                                                            ificant bit in N
+  715 0000029E 2601            MOVS             R6,#1
+  716 000002A0 4035            ANDS             R5,R5,R6    ; R5 = (N & LEFT_MA
+                                                            SK) >> 31
+  717 000002A2 432A            ORRS             R2,R2,R5    ; R |= (N & LEFT_MA
+                                                            SK) >> 31
+  718 000002A4 0040            LSLS             R0,R0,#1    ; N = N << 1
+  719 000002A6 428A            CMP              R2,R1       ; if (R >= D)
+  720 000002A8 D303            BLO              DIV_ITER    ; continue;
+  721 000002AA 1A52            SUBS             R2,R2,R1    ; R = R - D
+  722 000002AC 40A6            LSLS             R6,R6,R4    ; R6 = 1 << i
+  723 000002AE 0035            MOVS             R5,R6
+  724 000002B0 432B            ORRS             R3,R3,R5    ; Q = Q | (1 << i)
+  725 000002B2 1E64    DIV_ITER
+                               SUBS             R4,R4,#1    ; i--
+  726 000002B4 E7EF            B                DIV_FOR     ; For loop
+  727 000002B6 0018    DIVU_FINISH
+                               MOVS             R0,R3       ; Set the outputs
+  728 000002B8 0011            MOVS             R1,R2       ;
+  729 000002BA         ; Clear the carry flag
+  730 000002BA F3EF 8200       MRS              R2,APSR
+  731 000002BE 2320            MOVS             R3,#0x20
+  732 000002C0 061B            LSLS             R3,R3,#24
+  733 000002C2 439A            BICS             R2,R2,R3
+  734 000002C4 F382 8800       MSR              APSR,R2
+  735 000002C8 E007            B                DIVU_STOP
+  736 000002CA 2301    DIVU_0  MOVS             R3,#1       ; Init R3 as 1
+  737 000002CC         ; Set the carry flag
+  738 000002CC F3EF 8200       MRS              R2,APSR
+  739 000002D0 2320            MOVS             R3,#0x20
+  740 000002D2 061B            LSLS             R3,R3,#24
+  741 000002D4 431A            ORRS             R2,R2,R3
+
+
+
+ARM Macro Assembler    Page 18 Timer driver
+
+
+  742 000002D6 F382 8800       MSR              APSR,R2
+  743 000002DA BCFC    DIVU_STOP
+                               POP              {R2-R7}
+  744 000002DC BD00            POP              {PC}
+  745 000002DE                 ENDP
+  746 000002DE         
+  747 000002DE         
+  748 000002DE         ; PutChar will print a character to the terminal
+  749 000002DE         ; Subroutines used: (none)
+  750 000002DE         ; Input: R0 (character to print)
+  751 000002DE         ; Output; None
+  752 000002DE         ; Register modification list: R1-R3
+  753 000002DE         PutChar PROC             {R0-R12}
+  754 000002DE B503            PUSH             {R0,R1,LR}
+  755 000002E0 4962            LDR              R1,=TxQueue
+  756 000002E2 B672    putchar_l
+                               CPSID            I
+  757 000002E4 F7FF FFFE       BL               Enqueue
+  758 000002E8 B662            CPSIE            I
+  759 000002EA D2FA            BCS              putchar_l
+  760 000002EC         ; Enable the Tx interrupt
+  761 000002EC 4866            LDR              R0,=UART0_BASE
+  762 000002EE 21AC            MOVS             R1,#UART0_C2_TI_RI
+  763 000002F0 70C1            STRB             R1,[R0,#UART0_C2_OFFSET]
+  764 000002F2 BD03            POP              {R0,R1,PC}
+  765 000002F4                 ENDP
+  766 000002F4         
+  767 000002F4         ; GetChar will real a character from the terminal
+  768 000002F4         ; Subroutines used: (none)
+  769 000002F4         ; Input: None
+  770 000002F4         ; Output; R0 (character read from terminal)
+  771 000002F4         ; Register modification list: R1-R3
+  772 000002F4         GetChar PROC             {R1-R12}
+  773 000002F4 B502            PUSH             {R1,LR}
+  774 000002F6 495E            LDR              R1,=RxQueue
+  775 000002F8 B672    getchar_l
+                               CPSID            I
+  776 000002FA F7FF FFFE       BL               Dequeue
+  777 000002FE B662            CPSIE            I
+  778 00000300 D2FA            BCS              getchar_l
+  779 00000302 BD02            POP              {R1,PC}
+  780 00000304                 ENDP
+  781 00000304         
+  782 00000304         
+  783 00000304         ; UART0_ISR will handler the UART0 interrupt
+  784 00000304         ; when data is ready to recieved/transmitted
+  785 00000304         ; Subroutines used: Enqueue, Dequeue
+  786 00000304         ; Input: None
+  787 00000304         ; Output: None
+  788 00000304         ; Reigster modification: None
+  789 00000304         UART0_ISR
+                               PROC             {R0-R12}
+  790 00000304 B500            PUSH             {LR}
+  791 00000306 B672            CPSID            I           ; Don't interrupt i
+                                                            n the middle of thi
+                                                            s one
+  792 00000308 495F            LDR              R1,=UART0_BASE
+  793 0000030A 2280            MOVS             R2,#UART0_C2_TIE_MASK
+  794 0000030C 78CB            LDRB             R3,[R1,#UART0_C2_OFFSET]
+
+
+
+ARM Macro Assembler    Page 19 Timer driver
+
+
+  795 0000030E 421A            TST              R2,R3       ; If TIE = 1
+  796 00000310 D00D            BEQ              check_Rx
+  797 00000312         
+  798 00000312         ; Check if there if the transmit
+  799 00000312         ; register is empty
+  800 00000312 2280            MOVS             R2,#UART0_S1_TDRE_MASK
+  801 00000314 790B            LDRB             R3,[R1,#UART0_S1_OFFSET]
+  802 00000316 421A            TST              R2,R3
+  803 00000318 D009            BEQ              check_Rx    ; Tx is not the sou
+                                                            rce
+  804 0000031A         ; Get the next character from the Tx buffer
+  805 0000031A 4954            LDR              R1,=TxQueue
+  806 0000031C F7FF FFFE       BL               Dequeue
+  807 00000320 D202            BCS              disable_tx
+  808 00000322         ; Dequeue successful, write it to
+  809 00000322         ; the data register
+  810 00000322 4959            LDR              R1,=UART0_BASE
+  811 00000324 71C8            STRB             R0,[R1,#UART0_D_OFFSET]
+  812 00000326 E002            B                check_Rx
+  813 00000328         disable_tx                           ; No data to send, 
+                                                            disable this interr
+                                                            upt so we
+  814 00000328         ; don't cause an infinite loop
+  815 00000328         ; Disable Tx interrupt
+  816 00000328 4957            LDR              R1,=UART0_BASE
+  817 0000032A 222C            MOVS             R2,#UART0_C2_T_RI
+  818 0000032C 70CA            STRB             R2,[R1,#UART0_C2_OFFSET]
+  819 0000032E 2220    check_Rx
+                               MOVS             R2,#UART0_S1_RDRF_MASK
+  820 00000330 790B            LDRB             R3,[R1,#UART0_S1_OFFSET]
+  821 00000332 421A            TST              R2,R3
+  822 00000334 D003            BEQ              uart0_isr_done
+  823 00000336         
+  824 00000336 79C8            LDRB             R0,[R1,#UART0_D_OFFSET]
+  825 00000338 494D            LDR              R1,=RxQueue
+  826 0000033A F7FF FFFE       BL               Enqueue     ; Put R0 in the RxQ
+                                                            ueue
+  827 0000033E B662    uart0_isr_done
+                               CPSIE            I
+  828 00000340 BD00            POP{PC}
+  829 00000342                 ENDP
+  830 00000342         
+  831 00000342         PIT_ISR PROC             {R0-R12}
+  832 00000342 484C            LDR              R0,=StopWatchRecord
+  833 00000344         
+  834 00000344         ; Check if we are timing
+  835 00000344 7901            LDRB             R1,[R0,#4]
+  836 00000346 4209            TST              R1,R1
+  837 00000348 D002            BEQ              pit_finished ; We are not timin
+                                                            g, exit
+  838 0000034A         ; Increment the counter
+  839 0000034A 6801            LDR              R1,[R0,#0]
+  840 0000034C 1C49            ADDS             R1,R1,#1
+  841 0000034E 6001            STR              R1,[R0,#0]
+  842 00000350         pit_finished
+  843 00000350         ; Clear interrupt
+  844 00000350 4852            LDR              R0,=PIT_CH0_BASE
+  845 00000352 4953            LDR              R1,=PIT_TFLG_TIF_MASK
+  846 00000354 60C1            STR              R1,[R0,#PIT_TFLG_OFFSET]
+
+
+
+ARM Macro Assembler    Page 20 Timer driver
+
+
+  847 00000356 4770            BX               LR
+  848 00000358                 ENDP
+  849 00000358         
+  850 00000358         ; Print a NULL terminated string
+  851 00000358         ; SUBROUTINES USED
+  852 00000358         ;   - PutChar (Print each character)
+  853 00000358         ; PARAMS
+  854 00000358         ;   INPUT R0: pointer to the target string (word address
+                       )
+  855 00000358         ;   INPUT R1: size of the string buffer so that to not o
+                       verflow (unsigned word value)
+  856 00000358         ;   OUTPUT  : NONE
+  857 00000358         PutStringSB
+                               PROC             {R0-R12}
+  858 00000358 B51F            PUSH             {R0-R4,LR}
+  859 0000035A         ; put_string_sb(char* r0, size_t r1)
+  860 0000035A         ;   iter = r0
+  861 0000035A         ;   while (*iter && iter - r0 < r1 - 1)
+  862 0000035A         ;       printf("%c", *iter)
+  863 0000035A         ;       iter++
+  864 0000035A 0002            MOVS             R2,R0       ; iter = r0
+  865 0000035C 0004            MOVS             R4,R0       ; start = r0 (r0 ne
+                                                            eds to be used for 
+                                                            printing)
+  866 0000035E 1E49            SUBS             R1,R1,#1
+  867 00000360         
+  868 00000360 7813    putwhile
+                               LDRB             R3,[R2,#0]  ; r3 = *iter
+  869 00000362 2B00            CMP              R3,#0       ; if (!*r3) break
+  870 00000364 D007            BEQ              putdone
+  871 00000366 1B13            SUBS             R3,R2,R4
+  872 00000368 428B            CMP              R3,R1       ; if (iter - start 
+                                                            >= r1 - 1) break
+  873 0000036A DA04            BGE              putdone
+  874 0000036C 7810            LDRB             R0,[R2,#0]  ; r0 = *iter
+  875 0000036E F7FF FFFE       BL               PutChar     ; printf("%c", *ite
+                                                            r);
+  876 00000372 1C52            ADDS             R2,R2,#1    ; iter++
+  877 00000374 E7F4            B                putwhile
+  878 00000376 BD1F    putdone POP              {R0-R4,PC}
+  879 00000378         
+  880 00000378                 ENDP
+  881 00000378         
+  882 00000378         ; Initialize the UART0 serial polling with
+  883 00000378         ; 8 databits, no parity, one stop bit
+  884 00000378         ; Subroutines used: (none)
+  885 00000378         ; Input: None
+  886 00000378         ; Output: None
+  887 00000378         ; Register modification: R0-R2
+  888 00000378         Init_UART0_IRQ
+                               PROC             {R3-R12}
+  889 00000378 B507            PUSH             {R0-R2,LR}
+  890 0000037A         ; Select/configure UART0 sources
+  891 0000037A 04000000 
+                       SIM_SOPT2_UART0SRC_MCGFLLCLK
+                               EQU              (1 << SIM_SOPT2_UART0SRC_SHIFT)
+  892 0000037A         ; Set the UART0 clock to 48 MHz
+  893 0000037A 484A            LDR              R0,=SIM_SOPT2
+  894 0000037C 494A            LDR              R1,=SIM_SOPT2_UART0SRC_MASK
+
+
+
+ARM Macro Assembler    Page 21 Timer driver
+
+
+  895 0000037E 6802            LDR              R2,[R0,#0]  ;current SIM_SOPT2v
+                                                            alue
+  896 00000380 438A            BICS             R2,R2,R1    ;only UART0SRCbits 
+                                                            cleared
+  897 00000382 494A            LDR              R1,=SIM_SOPT2_UART0SRC_MCGFLLCL
+K
+  898 00000384 430A            ORRS             R2,R2,R1    ;only UART0 bits ch
+                                                            anged
+  899 00000386 6002            STR              R2,[R0,#0]  ;update SIM_SOPT2
+  900 00000388         
+  901 00000388         ; Set SIM_SOPT5 for UART0 External
+  902 00000388 00010005 
+                       SIM_SOPT5_UART0_EXTERN_MASK_CLEAR
+                               EQU              (SIM_SOPT5_UART0ODE_MASK :OR: S
+IM_SOPT5_UART0RXSRC_MASK :OR: SIM_SOPT5_UART0TXSRC_MASK)
+  903 00000388 4849            LDR              R0,=SIM_SOPT5
+  904 0000038A 494A            LDR              R1,=SIM_SOPT5_UART0_EXTERN_MASK
+_CLEAR
+  905 0000038C 6802            LDR              R2,[R0,#0]  ;current SIM_SOPT5v
+                                                            alue
+  906 0000038E 438A            BICS             R2,R2,R1    ;only UART0 bits cl
+                                                            eared
+  907 00000390 6002            STR              R2,[R0,#0]  ;update SIM_SOPT5
+  908 00000392         
+  909 00000392         ; Enable clocks for UART0 and Port B
+  910 00000392         ; Enable UART0 clocks
+  911 00000392 4849            LDR              R0,=SIM_SCGC4
+  912 00000394 4949            LDR              R1,=SIM_SCGC4_UART0_MASK
+  913 00000396 6802            LDR              R2,[R0,#0]  ;current SIM_SCGC4v
+                                                            alue
+  914 00000398 430A            ORRS             R2,R2,R1    ;only UART0bit set
+  915 0000039A 6002            STR              R2,[R0,#0]  ;update SIM_SCGC4
+  916 0000039C         
+  917 0000039C         ; Set SIM_CGC5 for Port B Clock Enabled
+  918 0000039C 4848            LDR              R0,=SIM_SCGC5
+  919 0000039E 4947            LDR              R1,=SIM_SCGC5_PORTB_MASK
+  920 000003A0 6802            LDR              R2,[R0,#0]  ;current SIM_SCGC5v
+                                                            alue
+  921 000003A2 430A            ORRS             R2,R2,R1    ;only PORTBbit set
+  922 000003A4 6002            STR              R2,[R0,#0]  ;update SIM_SCGC5
+  923 000003A6         
+  924 000003A6         ; Select Port B mux pins to connect to UART0
+  925 000003A6 01000200 
+                       PORT_PCR_SET_PTB2_UART0_RX
+                               EQU              (PORT_PCR_ISF_MASK :OR: PORT_PC
+R_MUX_SELECT_2_MASK)
+  926 000003A6 01000200 
+                       PORT_PCR_SET_PTB1_UART0_TX
+                               EQU              (PORT_PCR_ISF_MASK :OR: PORT_PC
+R_MUX_SELECT_2_MASK)
+  927 000003A6         
+  928 000003A6 4847            LDR              R0,=PORTB_PCR2
+  929 000003A8 4947            LDR              R1,=PORT_PCR_SET_PTB2_UART0_RX
+  930 000003AA 6001            STR              R1,[R0,#0]  ;Port B pin 2 conne
+                                                            cts to UART0 Rx
+  931 000003AC 4847            LDR              R0,=PORTB_PCR1
+  932 000003AE 4946            LDR              R1,=PORT_PCR_SET_PTB1_UART0_TX
+  933 000003B0 6001            STR              R1,[R0,#0]  ;Port B pin 1 conne
+                                                            cts to UART0 Tx
+
+
+
+ARM Macro Assembler    Page 22 Timer driver
+
+
+  934 000003B2         
+  935 000003B2         ; Configure UART0 (register initialization)
+  936 000003B2         ; Load base addr for UART0
+  937 000003B2 4835            LDR              R0,=UART0_BASE
+  938 000003B4         
+  939 000003B4         ; Disable UART0
+  940 000003B4 210C            MOVS             R1,#UART0_C2_T_R
+  941 000003B6 78C2            LDRB             R2,[R0,#UART0_C2_OFFSET]
+  942 000003B8 438A            BICS             R2,R2,R1
+  943 000003BA 70C2            STRB             R2,[R0,#UART0_C2_OFFSET]
+  944 000003BC         
+  945 000003BC         ; Set UART0 baud rate?BDH before BDL
+  946 000003BC 2101            MOVS             R1,#UART0_BDH_9600
+  947 000003BE 7001            STRB             R1,[R0,#UART0_BDH_OFFSET]
+  948 000003C0 2138            MOVS             R1,#UART0_BDL_9600
+  949 000003C2 7041            STRB             R1,[R0,#UART0_BDL_OFFSET]
+  950 000003C4         
+  951 000003C4         ; Set UART0 character format for serial bit stream and c
+                       lear flags
+  952 000003C4 2100            MOVS             R1,#UART0_C1_8N1
+  953 000003C6 7081            STRB             R1,[R0,#UART0_C1_OFFSET]
+  954 000003C8 2100            MOVS             R1,#UART0_C3_NO_TXINV
+  955 000003CA 7181            STRB             R1,[R0,#UART0_C3_OFFSET]
+  956 000003CC 210F            MOVS             R1,#UART0_C4_NO_MATCH_OSR_16
+  957 000003CE 7281            STRB             R1,[R0,#UART0_C4_OFFSET]
+  958 000003D0 2100            MOVS             R1,#UART0_C5_NO_DMA_SSR_SYNC
+  959 000003D2 72C1            STRB             R1,[R0,#UART0_C5_OFFSET]
+  960 000003D4 211F            MOVS             R1,#UART0_S1_CLEAR_FLAGS
+  961 000003D6 7101            STRB             R1,[R0,#UART0_S1_OFFSET]
+  962 000003D8 21C0            MOVS             R1,#UART0_S2_NO_RXINV_BRK10_NO_
+LBKDETECT_CLEAR_FLAGS
+  963 000003DA 7141            STRB             R1,[R0,#UART0_S2_OFFSET]
+  964 000003DC         
+  965 000003DC         ; Enable UART0
+  966 000003DC 210C            MOVS             R1,#UART0_C2_T_R
+  967 000003DE 70C1            STRB             R1,[R0,#UART0_C2_OFFSET]
+  968 000003E0         
+  969 000003E0         ;Set UART0 IRQ priority
+  970 000003E0 483B            LDR              R0,=UART0_IPR
+  971 000003E2         ;LDR R1,=NVIC_IPR_UART0_MASK
+  972 000003E2 4A3C            LDR              R2,=NVIC_IPR_UART0_PRI_3
+  973 000003E4 6803            LDR              R3,[R0,#0]
+  974 000003E6         ;BICS R3,R3,R1
+  975 000003E6 4313            ORRS             R3,R3,R2
+  976 000003E8 6003            STR              R3,[R0,#0]
+  977 000003EA         
+  978 000003EA         ; Initialize the Rx and Tx queues
+  979 000003EA 4823            LDR              R0,=RxBuffer
+  980 000003EC 4920            LDR              R1,=RxQueue
+  981 000003EE 2205            MOVS             R2,#RX_BUF_SZ
+  982 000003F0 F7FF FFFE       BL               InitQueue
+  983 000003F4         
+  984 000003F4 4821            LDR              R0,=TxBuffer
+  985 000003F6 491D            LDR              R1,=TxQueue
+  986 000003F8 2228            MOVS             R2,#TX_BUF_SZ
+  987 000003FA F7FF FFFE       BL               InitQueue
+  988 000003FE         
+  989 000003FE         ;Clear any pending UART0 interrupts
+  990 000003FE 483A            LDR              R0,=NVIC_ICPR
+
+
+
+ARM Macro Assembler    Page 23 Timer driver
+
+
+  991 00000400 493A            LDR              R1,=NVIC_ICPR_UART0_MASK
+  992 00000402 6001            STR              R1,[R0,#0]
+  993 00000404         ;Unmask UART0 interrupts
+  994 00000404 483A            LDR              R0,=NVIC_ISER
+  995 00000406 4939            LDR              R1,=NVIC_ISER_UART0_MASK
+  996 00000408 6001            STR              R1,[R0,#0]
+  997 0000040A         
+  998 0000040A BD07            POP              {R0-R2,PC}
+  999 0000040C                 ENDP
+ 1000 0000040C         
+ 1001 0000040C         Init_PIT_IRQ
+                               PROC             {R0-R12}
+ 1002 0000040C B40F            PUSH             {R0-R3}
+ 1003 0000040E         ; Initialize the timer structure
+ 1004 0000040E 4819            LDR              R0,=StopWatchRecord
+ 1005 00000410 2100            MOVS             R1,#0
+ 1006 00000412 6001            STR              R1,[R0,#0]
+ 1007 00000414 7101            STRB             R1,[R0,#4]
+ 1008 00000416         
+ 1009 00000416 4838            LDR              R0,=SIM_SCGC6
+ 1010 00000418 4938            LDR              R1,=SIM_SCGC6_PIT_MASK
+ 1011 0000041A 6802            LDR              R2,[R0,#0]  ;current SIM_SCGC6 
+                                                            value
+ 1012 0000041C 430A            ORRS             R2,R2,R1    ;only PIT bit set
+ 1013 0000041E 6002            STR              R2,[R0,#0]  ;update SIM_SCGC6
+ 1014 00000420         
+ 1015 00000420         ;Disable PIT timer 0
+ 1016 00000420 481E            LDR              R0,=PIT_CH0_BASE
+ 1017 00000422 491F            LDR              R1,=PIT_TCTRL_TEN_MASK
+ 1018 00000424 6882            LDR              R2,[R0,#PIT_TCTRL_OFFSET]
+ 1019 00000426 438A            BICS             R2,R2,R1
+ 1020 00000428 6082            STR              R2,[R0,#PIT_TCTRL_OFFSET]
+ 1021 0000042A         
+ 1022 0000042A         ;Set PIT interrupt priority
+ 1023 0000042A 4835            LDR              R0,=PIT_IPR
+ 1024 0000042C 4935            LDR              R1,=NVIC_IPR_PIT_MASK
+ 1025 0000042E         ;LDR Rk,=NVIC_IPR_PIT_PRI_0
+ 1026 0000042E 6803            LDR              R3,[R0,#0]
+ 1027 00000430 438B            BICS             R3,R3,R1
+ 1028 00000432         ;ORRS Rl,Rl,Rk
+ 1029 00000432 6003            STR              R3,[R0,#0]
+ 1030 00000434         
+ 1031 00000434         ; Enable interrupts for PIT on channel 0
+ 1032 00000434 4819            LDR              R0,=PIT_CH0_BASE
+ 1033 00000436 2103            MOVS             R1,#PIT_TCTRL_CH_IE
+ 1034 00000438 6081            STR              R1,[R0,#PIT_TCTRL_OFFSET]
+ 1035 0000043A         
+ 1036 0000043A         ;Clear any pending PIT interrupts 
+ 1037 0000043A 482B            LDR              R0,=NVIC_ICPR
+ 1038 0000043C 4932            LDR              R1,=NVIC_ICPR_PIT_MASK
+ 1039 0000043E 6001            STR              R1,[R0,#0]
+ 1040 00000440         
+ 1041 00000440         ; Interrupt every 10ms
+ 1042 00000440 4816            LDR              R0,=PIT_CH0_BASE
+ 1043 00000442 4932            LDR              R1,=PIT_LDVAL_10ms
+ 1044 00000444 6001            STR              R1,[R0,#PIT_LDVAL_OFFSET]
+ 1045 00000446         
+ 1046 00000446         ; Enable PIT module
+ 1047 00000446 4832            LDR              R0,=PIT_BASE
+
+
+
+ARM Macro Assembler    Page 24 Timer driver
+
+
+ 1048 00000448 4915            LDR              R1,=PIT_MCR_EN_FRZ
+ 1049 0000044A 6001            STR              R1,[R0,#PIT_MCR_OFFSET]
+ 1050 0000044C         
+ 1051 0000044C         ;Unmask PIT interrupts
+ 1052 0000044C 4828            LDR              R0,=NVIC_ISER
+ 1053 0000044E 492E            LDR              R1,=NVIC_ISER_PIT_MASK
+ 1054 00000450 6001            STR              R1,[R0,#0]
+ 1055 00000452         
+ 1056 00000452         
+ 1057 00000452 BC0F            POP{R0-R3}
+ 1058 00000454 4770            BX               LR
+ 1059 00000456                 ENDP
+ 1060 00000456         
+ 1061 00000456         ;>>>>>   end subroutine code <<<<<
+ 1062 00000456 00 00           ALIGN
+ 1063 00000458         ;*******************************************************
+                       *********
+ 1064 00000458         ;Vector Table Mapped to Address 0 at Reset
+ 1065 00000458         ;Linker requires __Vectors to be exported
+ 1066 00000458 00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              4006A000 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              40037100 
+              00000001 
+              40048004 
+              0C000000 
+              04000000 
+              40048010 
+              00010005 
+              40048034 
+              00000400 
+              40048038 
+              4004A008 
+              01000200 
+              4004A004 
+              E000E40C 
+              000000C0 
+              00000000 
+              00000000 
+              00000000 
+              00000000 
+              E000E280 
+              00001000 
+              E000E100 
+              00000000 
+
+
+
+ARM Macro Assembler    Page 25 Timer driver
+
+
+              4004803C 
+              00800000 
+              E000E414 
+              00C00000 
+              00400000 
+              0003A8F5 
+              40037000         AREA             RESET, DATA, READONLY
+ 1067 00000000                 EXPORT           __Vectors
+ 1068 00000000                 EXPORT           __Vectors_End
+ 1069 00000000                 EXPORT           __Vectors_Size
+ 1070 00000000                 IMPORT           __initial_sp
+ 1071 00000000                 IMPORT           Dummy_Handler
+ 1072 00000000                 IMPORT           HardFault_Handler
+ 1073 00000000         __Vectors
+ 1074 00000000         ;ARM core vectors
+ 1075 00000000 00000000        DCD              __initial_sp ;00:end of stack
+ 1076 00000004 00000000        DCD              Reset_Handler ;01:reset vector
+ 1077 00000008 00000000        DCD              Dummy_Handler ;02:NMI
+ 1078 0000000C 00000000        DCD              HardFault_Handler 
+                                                            ;03:hard fault
+ 1079 00000010 00000000        DCD              Dummy_Handler ;04:(reserved)
+ 1080 00000014 00000000        DCD              Dummy_Handler ;05:(reserved)
+ 1081 00000018 00000000        DCD              Dummy_Handler ;06:(reserved)
+ 1082 0000001C 00000000        DCD              Dummy_Handler ;07:(reserved)
+ 1083 00000020 00000000        DCD              Dummy_Handler ;08:(reserved)
+ 1084 00000024 00000000        DCD              Dummy_Handler ;09:(reserved)
+ 1085 00000028 00000000        DCD              Dummy_Handler ;10:(reserved)
+ 1086 0000002C 00000000        DCD              Dummy_Handler ;11:SVCall (super
+                                                            visor call)
+ 1087 00000030 00000000        DCD              Dummy_Handler ;12:(reserved)
+ 1088 00000034 00000000        DCD              Dummy_Handler ;13:(reserved)
+ 1089 00000038 00000000        DCD              Dummy_Handler ;14:PendSV (Penda
+                                                            bleSrvReq)
+ 1090 0000003C         ;   pendable request 
+ 1091 0000003C         ;   for system service)
+ 1092 0000003C 00000000        DCD              Dummy_Handler ;15:SysTick (syst
+                                                            em tick timer)
+ 1093 00000040 00000000        DCD              Dummy_Handler ;16:DMA channel 0
+                                                             transfer 
+ 1094 00000044         ;   complete/error
+ 1095 00000044 00000000        DCD              Dummy_Handler ;17:DMA channel 1
+                                                             transfer
+ 1096 00000048         ;   complete/error
+ 1097 00000048 00000000        DCD              Dummy_Handler ;18:DMA channel 2
+                                                             transfer
+ 1098 0000004C         ;   complete/error
+ 1099 0000004C 00000000        DCD              Dummy_Handler ;19:DMA channel 3
+                                                             transfer
+ 1100 00000050         ;   complete/error
+ 1101 00000050 00000000        DCD              Dummy_Handler ;20:(reserved)
+ 1102 00000054 00000000        DCD              Dummy_Handler ;21:FTFA command 
+                                                            complete/
+ 1103 00000058         ;   read collision
+ 1104 00000058 00000000        DCD              Dummy_Handler ;22:low-voltage d
+                                                            etect;
+ 1105 0000005C         ;   low-voltage warning
+ 1106 0000005C 00000000        DCD              Dummy_Handler ;23:low leakage w
+                                                            akeup
+ 1107 00000060 00000000        DCD              Dummy_Handler ;24:I2C0
+
+
+
+ARM Macro Assembler    Page 26 Timer driver
+
+
+ 1108 00000064 00000000        DCD              Dummy_Handler ;25:(reserved)
+ 1109 00000068 00000000        DCD              Dummy_Handler ;26:SPI0
+ 1110 0000006C 00000000        DCD              Dummy_Handler ;27:(reserved)
+ 1111 00000070 00000000        DCD              UART0_ISR   ;28:UART0 (status; 
+                                                            error)
+ 1112 00000074 00000000        DCD              Dummy_Handler ;29:(reserved)
+ 1113 00000078 00000000        DCD              Dummy_Handler ;30:(reserved)
+ 1114 0000007C 00000000        DCD              Dummy_Handler ;31:ADC0
+ 1115 00000080 00000000        DCD              Dummy_Handler ;32:CMP0
+ 1116 00000084 00000000        DCD              Dummy_Handler ;33:TPM0
+ 1117 00000088 00000000        DCD              Dummy_Handler ;34:TPM1
+ 1118 0000008C 00000000        DCD              Dummy_Handler ;35:(reserved)
+ 1119 00000090 00000000        DCD              Dummy_Handler ;36:RTC (alarm)
+ 1120 00000094 00000000        DCD              Dummy_Handler ;37:RTC (seconds)
+                                                            
+ 1121 00000098 00000000        DCD              PIT_ISR     ;38:PIT
+ 1122 0000009C 00000000        DCD              Dummy_Handler ;39:(reserved)
+ 1123 000000A0 00000000        DCD              Dummy_Handler ;40:(reserved)
+ 1124 000000A4 00000000        DCD              Dummy_Handler ;41:DAC0
+ 1125 000000A8 00000000        DCD              Dummy_Handler ;42:TSI0
+ 1126 000000AC 00000000        DCD              Dummy_Handler ;43:MCG
+ 1127 000000B0 00000000        DCD              Dummy_Handler ;44:LPTMR0
+ 1128 000000B4 00000000        DCD              Dummy_Handler ;45:(reserved)
+ 1129 000000B8 00000000        DCD              Dummy_Handler ;46:PORTA
+ 1130 000000BC 00000000        DCD              Dummy_Handler ;47:PORTB
+ 1131 000000C0         __Vectors_End
+ 1132 000000C0 000000C0 
+                       __Vectors_Size
+                               EQU              __Vectors_End - __Vectors
+ 1133 000000C0                 ALIGN
+ 1134 000000C0         ;*******************************************************
+                       *********
+ 1135 000000C0         ;Constants
+ 1136 000000C0                 AREA             MyConst,DATA,READONLY
+ 1137 00000000         ;>>>>> begin constants here <<<<<
+ 1138 00000000 50 72 65 
+              73 73 20 
+              6B 65 79 
+              20 66 6F 
+              72 20 73 
+              74 6F 70 
+              77 61 74 
+              63 68 20 
+              63 6F 6D 
+              6D 61 6E 
+              64 20 28 
+              43 2C 44 
+              2C 48 2C 
+              50 2C 54 
+              29 0D 0A 
+              00       initial_p
+                               DCB              "Press key for stopwatch comman
+d (C,D,H,P,T)\r\n\0"
+ 1139 0000002E 3E 00   prompt  DCB              ">\0"
+ 1140 00000030 44 3A 20 
+              20 20 25 
+              64 20 78 
+              20 30 2E 
+              30 31 73 
+
+
+
+ARM Macro Assembler    Page 27 Timer driver
+
+
+              0D 0A 00 display DCB              "D:   %d x 0.01s\r\n\0"
+ 1141 00000042 53 74 61 
+              74 75 73 
+              00       status_s
+                               DCB              "Status\0"
+ 1142 00000049 53 75 63 
+              63 65 73 
+              73 00    success DCB              "Success\0"
+ 1143 00000051 46 61 69 
+              6C 75 72 
+              65 00    failure DCB              "Failure\0"
+ 1144 00000059 0D 0A 00 
+                       newline DCB              "\r\n\0"
+ 1145 0000005C 0D 0A 0D 
+              0A 49 6E 
+              76 61 6C 
+              69 64 20 
+              66 6F 72 
+              6D 61 74 
+              20 73 74 
+              72 69 6E 
+              67 20 27 
+              25 73 27 
+              0D 0A 00 invalid DCB              "\r\n\r\nInvalid format string 
+'%s'\r\n\0"
+ 1146 0000007D 49 6E 76 
+              61 6C 69 
+              64 20 63 
+              6F 6D 6D 
+              61 6E 64 
+              20 27 25 
+              63 27 0D 
+              0A 00    invalid_in
+                               DCB              "Invalid command '%c'\r\n\0"
+ 1147 00000094 3E 48 3A 
+              20 43 28 
+              6C 65 61 
+              72 29 2C 
+              44 28 69 
+              73 70 6C 
+              61 79 29 
+              2C 48 28 
+              65 6C 70 
+              29 2C 50 
+              28 61 75 
+              73 65 29 
+              2C 54 28 
+              69 6D 65 
+              29 0D 0A 
+              00       help    DCB              ">H: C(lear),D(isplay),H(elp),P
+(ause),T(ime)\r\n\0"
+ 1148 000000C2 54 65 73 
+              74 20 73 
+              74 72 69 
+              6E 67 20 
+              25 6A 64 
+              73 6F 6B 
+              61 00    test_invalid_printf
+                               DCB              "Test string %jdsoka\0" ; Just 
+
+
+
+ARM Macro Assembler    Page 28 Timer driver
+
+
+                                                            used to test the pr
+                                                            intf() function
+ 1149 000000D6         ;>>>>>   end constants here <<<<<
+ 1150 000000D6 00 00           ALIGN
+ 1151 000000D8         ;*******************************************************
+                       *********
+ 1152 000000D8         ;Variables
+ 1153 000000D8                 AREA             MyData,DATA,READWRITE
+ 1154 00000000         ;>>>>> begin variables here <<<<<
+ 1155 00000000 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 RxQueue SPACE            Q_REC_SZ
+ 1156 00000012 00 00           ALIGN
+ 1157 00000014 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 TxQueue SPACE            Q_REC_SZ
+ 1158 00000026 00 00           ALIGN
+ 1159 00000028 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00    printf_static
+                               SPACE            20
+ 1160 0000003C 00 00 00 
+              00 00    StopWatchRecord
+                               SPACE            5
+ 1161 00000041 00 00 00 
+              00 00    RxBuffer
+                               SPACE            RX_BUF_SZ
+ 1162 00000046 00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00 00 00 
+              00       TxBuffer
+                               SPACE            TX_BUF_SZ
+ 1163 0000006E         ;>>>>>   end variables here <<<<<
+ 1164 0000006E 00 00           ALIGN
+ 1165 00000070                 END
+Command Line: --debug --diag_suppress=9931 --cpu=Cortex-M0+ --apcs=interwork --
+depend=.\objects\exercise10.d -o.\objects\exercise10.o -I"C:\Users\Andrei Tumba
+r\AppData\Local\Arm\Packs\Keil\Kinetis_KLxx_DFP\1.14.0\Device\Include" -IC:\Kei
+l_v5\ARM\CMSIS\Include --predefine="__EVAL SETA 1" --predefine="__UVISION_VERSI
+
+
+
+ARM Macro Assembler    Page 29 Timer driver
+
+
+ON SETA 531" --predefine="MKL05Z32xxx4 SETA 1" --list=.\listings\exercise10.lst
+ Exercise10.s
